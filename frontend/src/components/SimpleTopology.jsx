@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
 
 // Node type colors and sizes
 const nodeConfig = {
@@ -40,12 +42,13 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api
 export function SimpleTopology() {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] })
   const [selectedNode, setSelectedNode] = useState(null)
-  const [showLabels, setShowLabels] = useState(true)
+  const [showImages, setShowImages] = useState(true)
   const [graphWidth, setGraphWidth] = useState(800)
   const [graphHeight, setGraphHeight] = useState(600)
   const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [timeRange, setTimeRange] = useState('30m')
   const graphRef = useRef()
 
   const colorForType = (type) => nodeConfig[type]?.color || nodeConfig.default.color
@@ -124,7 +127,7 @@ export function SimpleTopology() {
     try {
       setLoading(true)
       setError(null)
-      const params = new URLSearchParams({ page: '1', limit: '200', timeRange: '30m' })
+      const params = new URLSearchParams({ page: '1', limit: '200', timeRange })
       const [eventsRes, camsRes, snapsRes] = await Promise.all([
         fetch(`${API_BASE}/events?${params.toString()}`),
         fetch(`${API_BASE}/events/cameras`),
@@ -151,7 +154,7 @@ export function SimpleTopology() {
     const onRefresh = () => fetchGraphData()
     window.addEventListener('dashboard-refresh', onRefresh)
     return () => window.removeEventListener('dashboard-refresh', onRefresh)
-  }, [])
+  }, [timeRange])
 
 
   const handleNodeClick = (node) => {
@@ -253,6 +256,24 @@ export function SimpleTopology() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Time Range</label>
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Time Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30m">Last 30 minutes</SelectItem>
+                  <SelectItem value="1h">Last 1 hour</SelectItem>
+                  <SelectItem value="4h">Last 4 hours</SelectItem>
+                  <SelectItem value="12h">Last 12 hours</SelectItem>
+                  <SelectItem value="24h">Last 24h</SelectItem>
+                  <SelectItem value="7d">Last 7 days</SelectItem>
+                  <SelectItem value="30d">Last 30 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <Settings className="w-5 h-5" />
             <span>Graph Controls</span>
           </CardTitle>
@@ -263,10 +284,10 @@ export function SimpleTopology() {
               <label className="text-sm font-medium mb-2 block">Display Options</label>
               <div className="flex items-center space-x-2">
                 <Switch
-                  checked={showLabels}
-                  onCheckedChange={setShowLabels}
+                  checked={showImages}
+                  onCheckedChange={setShowImages}
                 />
-                <span className="text-sm">Show Labels</span>
+                <span className="text-sm">Show Images</span>
               </div>
             </div>
 
@@ -321,7 +342,7 @@ export function SimpleTopology() {
                   graphData={graphData}
                   width={graphWidth}
                   height={graphHeight}
-                  nodeLabel={showLabels ? 'name' : ''}
+                  nodeLabel={''}
                   nodeColor="color"
                   nodeVal="size"
                   linkColor="color"
@@ -340,12 +361,15 @@ export function SimpleTopology() {
                     ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI, false)
                     ctx.fill()
 
-                    // Draw label if enabled
-                    if (showLabels && globalScale > 0.5) {
-                      ctx.textAlign = 'center'
-                      ctx.textBaseline = 'middle'
-                      ctx.fillStyle = '#000'
-                      ctx.fillText(label, node.x, node.y + node.size + fontSize)
+                    // Optionally draw thumbnail images for snapshot nodes
+                    if (showImages && node.type === 'Image' && node.properties?.image_url) {
+                      const img = new Image()
+                      img.crossOrigin = 'anonymous'
+                      img.onload = () => {
+                        const size = Math.max(10, node.size * 2)
+                        ctx.drawImage(img, node.x - size/2, node.y - size/2, size, size)
+                      }
+                      img.src = node.properties.image_url
                     }
                   }}
                 />

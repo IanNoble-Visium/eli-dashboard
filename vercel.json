@@ -4,23 +4,16 @@
     {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
+      "config": { "distDir": "dist" }
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.py" },
     { "src": "/assets/(.*)", "headers": { "cache-control": "max-age=31536000, immutable" } },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
-    "VITE_API_BASE_URL": "/api"
+    "VITE_API_BASE_URL": "@vite_api_base_url"
   }
 }
 

@@ -36,5 +36,7 @@ class Config:
     DEBUG_DASHBOARD_TOKEN = os.environ.get('DEBUG_DASHBOARD_TOKEN') or 'WC6DU8sCxuDG'
     
     # CORS configuration
-    CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://localhost:5001']
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '').split(',') if os.environ.get('CORS_ORIGINS') else [
+        'http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://localhost:5001'
+    ]
 
