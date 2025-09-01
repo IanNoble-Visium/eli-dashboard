@@ -1,0 +1,7 @@
+node_modules
+.vite
+.vercel
+**/*.map
+api
+backend
+
