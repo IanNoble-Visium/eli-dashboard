@@ -1,28 +1,28 @@
 import { useState, useEffect } from 'react'
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table'
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select'
 import {
   Dialog,
@@ -32,14 +32,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { 
-  Database, 
-  Search, 
-  Filter, 
-  Download, 
-  RefreshCw, 
-  Eye, 
-  Edit, 
+import {
+  Database,
+  Search,
+  Filter,
+  Download,
+  RefreshCw,
+  Eye,
+  Edit,
   Trash2,
   Plus,
   Calendar,
@@ -217,23 +217,23 @@ export function TableView() {
 
   // Filter and search logic
   const filteredEvents = events.filter(event => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       event.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
       event.channel_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       event.id.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesLevel = filterLevel === 'all' || event.level === filterLevel
     const matchesStatus = filterStatus === 'all' || event.status === filterStatus
-    
+
     return matchesSearch && matchesLevel && matchesStatus
   })
 
   const filteredSnapshots = snapshots.filter(snapshot => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       snapshot.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
       snapshot.event_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       snapshot.id.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     return matchesSearch
   })
 
@@ -282,7 +282,7 @@ export function TableView() {
             Comprehensive view of all captured events and snapshots with CRUD capabilities
           </p>
         </div>
-        
+
         <div className="flex items-center space-x-4">
           <Badge variant="outline" className="flex items-center space-x-1">
             <Database className="w-3 h-3" />
@@ -293,6 +293,22 @@ export function TableView() {
             <ImageIcon className="w-3 h-3" />
             <span>{snapshots.length} snapshots</span>
           </Badge>
+
+
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Time Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30m">Last 30 minutes</SelectItem>
+              <SelectItem value="1h">Last 1 hour</SelectItem>
+              <SelectItem value="4h">Last 4 hours</SelectItem>
+              <SelectItem value="12h">Last 12 hours</SelectItem>
+              <SelectItem value="24h">Last 24h</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+            </SelectContent>
+          </Select>
 
           <Button onClick={() => fetchData(currentPage, itemsPerPage)} variant="outline" size="sm" disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -325,7 +341,7 @@ export function TableView() {
                 Snapshots ({snapshots.length})
               </Button>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Search className="w-4 h-4" />
@@ -336,7 +352,7 @@ export function TableView() {
                   className="w-64"
                 />
               </div>
-              
+
               {activeTab === 'events' && (
                 <>
                   <Select value={filterLevel} onValueChange={setFilterLevel}>
@@ -350,7 +366,7 @@ export function TableView() {
                       <SelectItem value="ERROR">ERROR</SelectItem>
                     </SelectContent>
                   </Select>
-                  
+
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
                     <SelectTrigger className="w-32">
                       <SelectValue placeholder="Status" />
@@ -364,7 +380,7 @@ export function TableView() {
                   </Select>
                 </>
               )}
-              
+
               <Button variant="outline" size="sm">
                 <Download className="w-4 h-4 mr-2" />
                 Export
@@ -372,7 +388,7 @@ export function TableView() {
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           {loading ? (
             <div className="h-64 flex items-center justify-center">
@@ -571,7 +587,7 @@ export function TableView() {
                 <div className="text-sm text-muted-foreground">
                   Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, currentData.length)} of {currentData.length} records
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Button
                     variant="outline"

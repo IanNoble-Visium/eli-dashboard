@@ -5,7 +5,7 @@ import { Header } from '@/components/Header'
 import { ExecutiveDashboard } from '@/components/ExecutiveDashboard'
 import { GeographicMap } from '@/components/GeographicMap'
 import { SimpleTopology } from '@/components/SimpleTopology'
-import { SimpleTable } from '@/components/SimpleTable'
+import { TableView } from '@/components/TableView'
 import { SearchView } from '@/components/SearchView'
 import './App.css'
 
@@ -53,7 +53,7 @@ function App() {
               <Route path="/map" element={<GeographicMap />} />
               <Route path="/geographic-map" element={<GeographicMap />} />
               <Route path="/topology" element={<SimpleTopology />} />
-              <Route path="/table" element={<SimpleTable />} />
+              <Route path="/table" element={<TableView />} />
               <Route path="/search" element={<SearchView />} />
             </Routes>
           </main>
