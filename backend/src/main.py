@@ -29,11 +29,17 @@ app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
 app.register_blueprint(events_bp, url_prefix='/api/events')
 app.register_blueprint(snapshots_bp, url_prefix='/api/snapshots')
 
-# SQLite database for user management (keeping original functionality)
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
+# Use PostgreSQL for user management via SQLAlchemy
+# Normalize DATABASE_URL for SQLAlchemy (postgres:// -> postgresql://)
+db_url = Config.DATABASE_URL
+if db_url and db_url.startswith('postgres://'):
+    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db.init_app(app)
 with app.app_context():
+    # Create the users table in PostgreSQL if it does not exist
     db.create_all()
 
 @app.route('/', defaults={'path': ''})

@@ -39,7 +39,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api
 export function ExecutiveDashboard() {
   const [metrics, setMetrics] = useState(null)
   const [timeline, setTimeline] = useState([])
-  const [timeRange, setTimeRange] = useState('24h')
+  const [timeRange, setTimeRange] = useState('30m')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -185,6 +185,10 @@ export function ExecutiveDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="30m">Last 30 minutes</SelectItem>
+              <SelectItem value="1h">Last 1 hour</SelectItem>
+              <SelectItem value="4h">Last 4 hours</SelectItem>
+              <SelectItem value="12h">Last 12 hours</SelectItem>
               <SelectItem value="24h">Last 24h</SelectItem>
               <SelectItem value="7d">Last 7 days</SelectItem>
               <SelectItem value="30d">Last 30 days</SelectItem>

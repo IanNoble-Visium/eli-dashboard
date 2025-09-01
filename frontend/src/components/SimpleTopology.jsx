@@ -124,7 +124,7 @@ export function SimpleTopology() {
     try {
       setLoading(true)
       setError(null)
-      const params = new URLSearchParams({ page: '1', limit: '200' })
+      const params = new URLSearchParams({ page: '1', limit: '200', timeRange: '30m' })
       const [eventsRes, camsRes, snapsRes] = await Promise.all([
         fetch(`${API_BASE}/events?${params.toString()}`),
         fetch(`${API_BASE}/events/cameras`),

@@ -158,8 +158,8 @@ const sampleSnapshots = [
 
 export function TableView() {
   const [activeTab, setActiveTab] = useState('events')
-  const [events, setEvents] = useState(sampleEvents)
-  const [snapshots, setSnapshots] = useState(sampleSnapshots)
+  const [events, setEvents] = useState([])
+  const [snapshots, setSnapshots] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -168,6 +168,7 @@ export function TableView() {
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+  const [timeRange, setTimeRange] = useState('30m')
 
   // Fetch data from API (with fallback to sample data)
   const fetchData = async (page = 1, limit = 10) => {
@@ -175,7 +176,7 @@ export function TableView() {
       setLoading(true)
       setError(null)
 
-      const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+      const params = new URLSearchParams({ page: String(page), limit: String(limit), timeRange })
 
       // Fetch real data from API
       const [eventsResponse, snapshotsResponse] = await Promise.all([
@@ -185,12 +186,12 @@ export function TableView() {
 
       if (eventsResponse.ok) {
         const eventsData = await eventsResponse.json()
-        setEvents(eventsData.events || sampleEvents)
+        setEvents(eventsData.events || [])
       }
 
       if (snapshotsResponse.ok) {
         const snapshotsData = await snapshotsResponse.json()
-        setSnapshots(snapshotsData.snapshots || sampleSnapshots)
+        setSnapshots(snapshotsData.snapshots || [])
       }
 
     } catch (err) {
@@ -206,13 +207,13 @@ export function TableView() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [timeRange])
 
   useEffect(() => {
     const handleRefresh = () => fetchData()
     window.addEventListener('dashboard-refresh', handleRefresh)
     return () => window.removeEventListener('dashboard-refresh', handleRefresh)
-  }, [])
+  }, [timeRange])
 
   // Filter and search logic
   const filteredEvents = events.filter(event => {
