@@ -1,13 +1,12 @@
 # ELI Dashboard - TruContext Intelligence Platform
 
-A comprehensive dashboard application for the ELI demo that visualizes and manages data captured from the IREX system. Built with React frontend and Flask backend, integrating with PostgreSQL, Neo4j, and Cloudinary.
+A comprehensive dashboard application for the ELI demo that visualizes and manages data captured from the IREX system. Built with React (Vite) frontend and Node.js serverless functions on Vercel, integrating with PostgreSQL and Neo4j.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+ and npm/yarn/pnpm
-- Python 3.11+ and pip
-- Access to PostgreSQL, Neo4j, and Cloudinary databases
+- Access to PostgreSQL and Neo4j databases
 
 ### Local Development
 
@@ -19,21 +18,8 @@ npm run dev
 ```
 The frontend will be available at `http://localhost:5173`
 
-#### 2. Backend Setup
-```bash
-cd backend
-pip install -r requirements.txt
-
-# Set environment variables (see .env.example)
-export POSTGRES_URL="your_postgres_connection_string"
-export NEO4J_URI="your_neo4j_uri"
-export NEO4J_USERNAME="your_neo4j_username"
-export NEO4J_PASSWORD="your_neo4j_password"
-export CLOUDINARY_URL="your_cloudinary_url"
-
-python src/main.py
-```
-The backend API will be available at `http://localhost:5001`
+#### 2. API (Node serverless) Setup
+API functions run via Vercel. For local development, you can run `vercel dev` or hit the hosted `/api` endpoints once deployed. Ensure Vercel env vars are set (see Environment Variables).
 
 ## 📊 Dashboard Features
 
@@ -70,67 +56,20 @@ The backend API will be available at `http://localhost:5001`
 
 ## 🌐 Deployment Options
 
-### Option 1: Vercel (Frontend) + Railway (Backend)
-
-#### Frontend Deployment to Vercel:
-1. Push your code to GitHub
-2. Connect your GitHub repo to Vercel
-3. Set build command: `npm run build`
-4. Set output directory: `dist`
-5. Add environment variable: `VITE_API_BASE_URL=https://your-backend-domain.com`
-
-#### Backend Deployment to Railway:
-1. Connect your GitHub repo to Railway
-2. Set root directory to `backend`
-3. Add environment variables in Railway dashboard
-4. Deploy automatically
-
-### Option 2: Docker Deployment
-
-#### Frontend Dockerfile:
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-EXPOSE 3000
-CMD ["npm", "run", "preview"]
-```
-
-#### Backend Dockerfile:
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 5001
-CMD ["python", "src/main.py"]
-```
-
-### Option 3: Traditional Hosting
-
-#### Frontend (Static Hosting):
-1. Run `npm run build`
-2. Upload `dist/` folder to your hosting service
-3. Configure environment variables
-
-#### Backend (VPS/Cloud):
-1. Set up Python environment
-2. Install dependencies: `pip install -r requirements.txt`
-3. Configure environment variables
-4. Run with: `python src/main.py`
+### Deployment: Vercel Monorepo (Frontend + /api)
+- vercel.json defines builds for `frontend` and `api` and routes `/api/*` to Node functions
+- Set VITE_API_BASE_URL=/api in Vercel env (or keep in vercel.json)
+- Push to main to deploy
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-#### Backend (.env):
+#### API (Serverless):
 ```env
 # PostgreSQL
 POSTGRES_URL=postgresql://user:pass@host:port/database
+# or DATABASE_URL
 
 # Neo4j
 NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
@@ -138,16 +77,13 @@ NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your_password
 NEO4J_DATABASE=neo4j
 
-# Cloudinary
-CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+# Optional CORS
+CORS_ORIGINS=https://your-frontend-domain.vercel.app,https://your-custom-domain.com
 ```
 
 #### Frontend (Environment Variables):
 ```env
-VITE_API_BASE_URL=http://localhost:5001/api
+VITE_API_BASE_URL=/api
 ```
 
 For production, update `VITE_API_BASE_URL` to your deployed backend URL.
@@ -211,8 +147,7 @@ The dashboard connects to your existing ELI Demo system:
 
 ### Adding New Features
 1. Frontend components go in `frontend/src/components/`
-2. Backend routes go in `backend/src/routes/`
-3. Database models go in `backend/src/database/`
+2. API routes go in `api/` (Node serverless), shared helpers in `api/_lib`
 
 ### Styling
 - Uses Tailwind CSS for styling
@@ -224,24 +159,21 @@ The dashboard connects to your existing ELI Demo system:
 
 ### Production Checklist
 - [ ] Set secure environment variables
-- [ ] Enable HTTPS/SSL certificates
-- [ ] Configure CORS for production domains
-- [ ] Set up database connection encryption
-- [ ] Implement rate limiting
-- [ ] Add authentication if required
+- [ ] Configure CORS for production domains (CORS_ORIGINS)
+- [ ] Set up database connection encryption (sslmode=require)
+- [ ] Implement rate limiting/auth if required
 
 ## 📞 Support
 
 ### Troubleshooting
-1. **Frontend not loading**: Check if backend API is running
+1. **Frontend not loading**: Verify deployment logs
 2. **API errors**: Verify database connections and environment variables
-3. **CORS issues**: Update CORS configuration in backend
-4. **Build failures**: Check Node.js and Python versions
+3. **CORS issues**: Update CORS_ORIGINS in Vercel
+4. **Build failures**: Check Node.js version
 
 ### Performance Optimization
-- Frontend: Enable gzip compression, use CDN
-- Backend: Implement caching, optimize database queries
-- Database: Add proper indexes, use connection pooling
+- Frontend: Automatic gzip/CDN on Vercel
+- API: Optimize queries; pg pool already enabled; consider caching if needed
 
 ## 🎉 Features Delivered
 
