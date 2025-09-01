@@ -91,35 +91,22 @@ For production, update `VITE_API_BASE_URL` to your deployed backend URL.
 ## 📁 Project Structure
 
 ```
-eli-dashboard-complete/
-├── frontend/                 # React Frontend Application
+eli-dashboard/
+├── frontend/                 # React Frontend Application (Vite)
 │   ├── src/
 │   │   ├── components/      # React components
-│   │   │   ├── ExecutiveDashboard.jsx
-│   │   │   ├── WorkingGeographicMap.jsx
-│   │   │   ├── SimpleTopology.jsx
-│   │   │   ├── SimpleTable.jsx
-│   │   │   ├── SearchView.jsx
-│   │   │   ├── RealTimeUpdates.jsx
-│   │   │   ├── Header.jsx
-│   │   │   └── Sidebar.jsx
-│   │   ├── lib/            # Utility functions
-│   │   └── App.jsx         # Main application
+│   │   └── App.jsx          # Main application
 │   ├── package.json
 │   └── vite.config.js
-├── backend/                 # Flask Backend API
-│   ├── src/
-│   │   ├── routes/         # API endpoints
-│   │   │   ├── dashboard.py
-│   │   │   ├── events.py
-│   │   │   └── snapshots.py
-│   │   ├── database/       # Database connections
-│   │   │   ├── postgres.py
-│   │   │   └── neo4j_db.py
-│   │   ├── config.py       # Configuration
-│   │   └── main.py         # Flask application
-│   └── requirements.txt
-└── README.md               # This file
+├── api/                      # Node.js Serverless API (Vercel)
+│   ├── _lib/                 # Shared DB/CORS helpers (pg, neo4j)
+│   ├── dashboard/            # Dashboard endpoints (health, metrics, timeline, graph)
+│   ├── events/               # Events endpoints (index, geo, types, cameras, [id])
+│   ├── snapshots/            # Snapshots endpoints (index, types, [id])
+│   └── users/                # Users endpoints
+├── vercel.json               # Vercel monorepo config
+├── package.json              # API dependencies (pg, neo4j-driver)
+└── README.md                 # This file
 ```
 
 ## 🔗 API Endpoints

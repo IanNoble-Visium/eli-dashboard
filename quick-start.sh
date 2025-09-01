@@ -11,21 +11,8 @@ fi
 
 echo "📋 Setting up environment..."
 
-# Backend setup
-echo "🔧 Setting up backend..."
-cd backend
-
-# Copy environment variables if they don't exist
-if [ ! -f ".env" ]; then
-    cp .env.example .env
-    echo "📝 Created .env file from example. Please edit with your database credentials."
-fi
-
-# Install Python dependencies
-echo "📦 Installing Python dependencies..."
-pip install -r requirements.txt
-
-cd ..
+# API setup (Node serverless on Vercel)
+echo "🔧 API runs via Vercel serverless functions. Ensure env vars are set in Vercel."
 
 # Frontend setup
 echo "🎨 Setting up frontend..."
