@@ -23,7 +23,15 @@ def get_events():
         
         # Calculate time filter
         now = datetime.utcnow()
-        if time_range == '24h':
+        if time_range == '30m':
+            start_time = now - timedelta(minutes=30)
+        elif time_range == '1h':
+            start_time = now - timedelta(hours=1)
+        elif time_range == '4h':
+            start_time = now - timedelta(hours=4)
+        elif time_range == '12h':
+            start_time = now - timedelta(hours=12)
+        elif time_range == '24h':
             start_time = now - timedelta(hours=24)
         elif time_range == '7d':
             start_time = now - timedelta(days=7)
@@ -31,7 +39,7 @@ def get_events():
             start_time = now - timedelta(days=30)
         else:
             start_time = now - timedelta(days=7)
-        
+
         start_timestamp = int(start_time.timestamp() * 1000)
         
         # Build WHERE conditions
@@ -187,7 +195,15 @@ def get_geo_events():
 
         # Calculate time filter
         now = datetime.utcnow()
-        if time_range == '24h':
+        if time_range == '30m':
+            start_time = now - timedelta(minutes=30)
+        elif time_range == '1h':
+            start_time = now - timedelta(hours=1)
+        elif time_range == '4h':
+            start_time = now - timedelta(hours=4)
+        elif time_range == '12h':
+            start_time = now - timedelta(hours=12)
+        elif time_range == '24h':
             start_time = now - timedelta(hours=24)
         elif time_range == '7d':
             start_time = now - timedelta(days=7)

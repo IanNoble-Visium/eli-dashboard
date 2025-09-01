@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet'
 import {
   MapPin,
   Camera,
@@ -9,17 +9,22 @@ import {
   RefreshCw,
   Layers,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Maximize2,
+  Minimize2,
+  Minus,
+  Square,
+  Move
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import FloatingWindow from '@/components/ui/floating-window'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LayersControl } from 'react-leaflet'
 import { Input } from '@/components/ui/input'
 import 'leaflet/dist/leaflet.css'
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 // Fix for default markers in react-leaflet
 import L from 'leaflet'
@@ -67,18 +72,34 @@ export function GeographicMap() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [timeRange, setTimeRange] = useState('24h')
+  const [timeRange, setTimeRange] = useState('30m')
   const [eventType, setEventType] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [cameras, setCameras] = useState([])
 
   const [mapCenter, setMapCenter] = useState([-12.0962697115117, -77.0260798931122]) // Lima, Peru
   const [mapZoom, setMapZoom] = useState(13)
+  // Hover thumbnail cache: { `${lat},${lng}`: url }
+  const [hoverThumbCache, setHoverThumbCache] = useState({})
+  const hoverAbortRef = useRef(null)
+  const hoverTimeoutRef = useRef(null)
+
   const [imageViewerOpen, setImageViewerOpen] = useState(false)
   const [eventGroup, setEventGroup] = useState([])
   const [currentEventIndex, setCurrentEventIndex] = useState(0)
   const [snapshotsCache, setSnapshotsCache] = useState({}) // { [eventId]: snapshots[] }
+  const [carouselApi, setCarouselApi] = useState(null)
+  const [carouselIndex, setCarouselIndex] = useState(0)
+
   const [loadingSnapshots, setLoadingSnapshots] = useState(false)
+  useEffect(() => {
+    if (!carouselApi) return
+    const onSelect = () => setCarouselIndex(carouselApi.selectedScrollSnap?.() ?? carouselApi.selectedScrollSnap)
+    onSelect()
+    try { carouselApi.on?.('select', onSelect) } catch {}
+    return () => { try { carouselApi.off?.('select', onSelect) } catch {} }
+  }, [carouselApi])
+
 
   const [selectedEvent, setSelectedEvent] = useState(null)
   const mapRef = useRef()
@@ -160,7 +181,7 @@ export function GeographicMap() {
     })
 
     // Test basic connectivity
-    fetch(`${API_BASE}/events/geo?timeRange=24h&limit=5`)
+    fetch(`${API_BASE}/events/geo?timeRange=30m&limit=5`)
       .then(res => {
         console.log('🧪 Test fetch response:', res.status, res.statusText)
         return res.json()
@@ -204,6 +225,21 @@ export function GeographicMap() {
         const currTime = new Date(e.start_time || 0).getTime()
         const prevTime = prev ? new Date(prev.start_time || 0).getTime() : -Infinity
         if (!prev || currTime >= prevTime) {
+
+
+          latestByCam.set(e.channel_id, {
+            channel_id: e.channel_id,
+            channel_name: e.channel_name,
+            lat: e.latitude,
+            lng: e.longitude,
+            start_time: e.start_time
+          })
+        }
+      }
+    })
+    return Array.from(latestByCam.values())
+  }, [events])
+
   const fetchSnapshotsForEvent = async (eventId) => {
     if (!eventId) return []
     if (snapshotsCache[eventId]) return snapshotsCache[eventId]
@@ -225,16 +261,12 @@ export function GeographicMap() {
   }
 
   const openImageViewerForEvent = async (event) => {
-    // Group events at same camera/location for navigation
     const group = events.filter(e => e.channel_id === event.channel_id)
       .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
     setEventGroup(group)
     const idx = group.findIndex(e => e.id === event.id)
     setCurrentEventIndex(Math.max(0, idx))
-
-    // Preload snapshots for current event
     await fetchSnapshotsForEvent(event.id)
-
     setSelectedEvent(event)
     setImageViewerOpen(true)
   }
@@ -244,6 +276,33 @@ export function GeographicMap() {
     const newIndex = currentEventIndex - 1
     setCurrentEventIndex(newIndex)
     const evt = eventGroup[newIndex]
+  // Hover: debounce fetch of first snapshot for marker
+  const requestHoverThumb = (eventObj) => {
+    const key = `${eventObj.latitude},${eventObj.longitude}`
+    if (hoverThumbCache[key]) return
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
+
+    hoverTimeoutRef.current = setTimeout(async () => {
+      try {
+        if (hoverAbortRef.current) hoverAbortRef.current.abort()
+        hoverAbortRef.current = new AbortController()
+        const res = await fetch(`${API_BASE}/snapshots?eventId=${encodeURIComponent(eventObj.id)}&limit=1`, {
+          signal: hoverAbortRef.current.signal
+        })
+
+
+        if (!res.ok) return
+        const data = await res.json()
+        const first = (data.snapshots || []).find(s => s.image_url)
+        if (first?.image_url) {
+          setHoverThumbCache(prev => ({ ...prev, [key]: first.image_url }))
+        }
+      } catch (_) {
+        // ignore aborts
+      }
+    }, 350)
+  }
+
     setSelectedEvent(evt)
     await fetchSnapshotsForEvent(evt.id)
   }
@@ -257,24 +316,11 @@ export function GeographicMap() {
     await fetchSnapshotsForEvent(evt.id)
   }
 
-          latestByCam.set(e.channel_id, {
-            channel_id: e.channel_id,
-            channel_name: e.channel_name,
-            lat: e.latitude,
-            lng: e.longitude,
-            start_time: e.start_time
-          })
-        }
-      }
-    })
-    return Array.from(latestByCam.values())
-  }, [events])
-
   const handleEventClick = async (event) => {
     setSelectedEvent(event)
     setMapCenter([event.latitude, event.longitude])
     setMapZoom(16)
-    await openImageViewerForEvent(event)
+    await openImageViewerForEvent(event) // open image modal with carousel
   }
 
   const formatTimestamp = (timestamp) => {
@@ -334,6 +380,10 @@ export function GeographicMap() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="30m">Last 30 minutes</SelectItem>
+                  <SelectItem value="1h">Last 1 hour</SelectItem>
+                  <SelectItem value="4h">Last 4 hours</SelectItem>
+                  <SelectItem value="12h">Last 12 hours</SelectItem>
                   <SelectItem value="24h">Last 24 hours</SelectItem>
                   <SelectItem value="7d">Last 7 days</SelectItem>
                   <SelectItem value="30d">Last 30 days</SelectItem>
@@ -482,9 +532,25 @@ export function GeographicMap() {
                         position={[event.latitude, event.longitude]}
                         icon={createCustomIcon(eventTypeColors[event.topic] || eventTypeColors.default)}
                         eventHandlers={{
-                          click: () => handleEventClick(event)
+                          click: () => handleEventClick(event),
+                          mouseover: () => requestHoverThumb(event),
+                          mouseout: () => cancelHoverFetch()
                         }}
                       >
+                        <Tooltip direction="top" offset={[0, -10]} opacity={1} sticky={false} permanent={false}>
+                          <div className="bg-background/95 border rounded shadow p-1">
+                            {(() => {
+                              const key = `${event.latitude},${event.longitude}`
+                              const url = hoverThumbCache[key]
+                              return url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={url} alt="thumb" style={{ width: 150, height: 100, objectFit: 'cover' }} loading="lazy" />
+                              ) : (
+                                <div className="w-[150px] h-[100px] grid place-items-center text-xs text-muted-foreground">Preview…</div>
+                              )
+                            })()}
+                          </div>
+                        </Tooltip>
                         <Popup>
                           <div className="p-2 min-w-64">
                             <h3 className="font-semibold mb-2">{event.topic}</h3>
@@ -557,20 +623,14 @@ export function GeographicMap() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 rounded-full" style={{backgroundColor: eventTypeColors.MotionDetected}} />
-      {/* Image Viewer Dialog */}
-      <Dialog open={imageViewerOpen} onOpenChange={setImageViewerOpen}>
-        <DialogContent className="max-w-4xl w-full">
-          <DialogHeader>
-            <DialogTitle className="flex justify-between items-center w-full">
-              <span>
-                {selectedEvent ? `${selectedEvent.topic} • ${selectedEvent.channel_name}` : 'Event'}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {selectedEvent ? new Date(selectedEvent.start_time).toLocaleString() : ''}
-              </span>
-            </DialogTitle>
-          </DialogHeader>
-
+      {/* Floating Image Viewer (draggable, resizable) */}
+      {imageViewerOpen && (
+        <FloatingWindow
+          open={imageViewerOpen}
+          onOpenChange={setImageViewerOpen}
+          title={selectedEvent ? `${selectedEvent.topic} • ${selectedEvent.channel_name}` : 'Event'}
+          initialRect={{ x: 260, y: 80, w: 900, h: 620 }}
+        >
           {/* Event navigation when multiple events at location */}
           {eventGroup.length > 1 && (
             <div className="flex items-center justify-between mb-3 text-sm">
@@ -586,7 +646,7 @@ export function GeographicMap() {
             </div>
           )}
 
-          {/* Carousel of snapshots for the selected event */}
+          {/* Carousel + thumbnail strip */}
           <div className="relative">
             {loadingSnapshots && (
               <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10 rounded-md">
@@ -594,27 +654,56 @@ export function GeographicMap() {
               </div>
             )}
 
-            {selectedEvent && (
-              <Carousel className="w-full">
-                <CarouselContent>
-                  {(snapshotsCache[selectedEvent.id] || []).map((snap) => (
-                    <CarouselItem key={snap.id}>
-                      <div className="flex items-center justify-center bg-black/80 rounded-md overflow-hidden h-[480px]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={snap.image_url}
-                          alt={`${selectedEvent.topic} snapshot`}
-                          className="max-h-full max-w-full object-contain"
-                          loading="lazy"
-                        />
-                      </div>
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                <CarouselPrevious className="-left-4" />
-                <CarouselNext className="-right-4" />
-              </Carousel>
-            )}
+            {selectedEvent && (() => {
+              const snaps = snapshotsCache[selectedEvent.id] || []
+              if (snaps.length === 0) {
+                return (
+                  <div className="flex items-center justify-center bg-black/80 rounded-md h-[60vh] text-white/80">
+                    No snapshots available for this event.
+                  </div>
+                )
+              }
+              return (
+                <>
+                  <Carousel className="w-full" setApi={setCarouselApi}>
+                    <CarouselContent>
+                      {snaps.map((snap, idx) => (
+                        <CarouselItem key={snap.id}>
+                          <div className="flex items-center justify-center bg-black/80 rounded-md overflow-hidden h-[55vh]">
+                            <img
+                              src={snap.image_url}
+                              alt={`${selectedEvent.topic} snapshot`}
+                              className="max-h-full max-w-full object-contain"
+                              loading="lazy"
+                            />
+                          </div>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="-left-4" />
+                    <CarouselNext className="-right-4" />
+                  </Carousel>
+
+                  {/* Index display */}
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {snaps.length > 0 && `${carouselIndex + 1} of ${snaps.length}`}
+                  </div>
+
+                  {/* Thumbnail strip */}
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    {snaps.map((snap, i) => (
+                      <button key={snap.id} className={`border rounded-xs overflow-hidden shrink-0 ${i===carouselIndex? 'ring-1 ring-primary' : ''}`} style={{ width: 96, height: 64 }}
+                        onClick={() => { carouselApi?.scrollTo(i); setCarouselIndex(i); }}
+                        title={`Image ${i + 1}`}
+                      >
+                        <img src={snap.image_url} alt="thumb" className="w-full h-full object-cover" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
+
 
             {/* Metadata */}
             {selectedEvent && (
@@ -634,8 +723,8 @@ export function GeographicMap() {
               </div>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </FloatingWindow>
+      )}
 
                   <span>Motion Detected</span>
                 </div>
