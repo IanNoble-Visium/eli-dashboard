@@ -74,6 +74,12 @@ export function GeographicMap() {
 
   const [mapCenter, setMapCenter] = useState([-12.0962697115117, -77.0260798931122]) // Lima, Peru
   const [mapZoom, setMapZoom] = useState(13)
+  const [imageViewerOpen, setImageViewerOpen] = useState(false)
+  const [eventGroup, setEventGroup] = useState([])
+  const [currentEventIndex, setCurrentEventIndex] = useState(0)
+  const [snapshotsCache, setSnapshotsCache] = useState({}) // { [eventId]: snapshots[] }
+  const [loadingSnapshots, setLoadingSnapshots] = useState(false)
+
   const [selectedEvent, setSelectedEvent] = useState(null)
   const mapRef = useRef()
 
@@ -198,6 +204,59 @@ export function GeographicMap() {
         const currTime = new Date(e.start_time || 0).getTime()
         const prevTime = prev ? new Date(prev.start_time || 0).getTime() : -Infinity
         if (!prev || currTime >= prevTime) {
+  const fetchSnapshotsForEvent = async (eventId) => {
+    if (!eventId) return []
+    if (snapshotsCache[eventId]) return snapshotsCache[eventId]
+    try {
+      setLoadingSnapshots(true)
+      const params = new URLSearchParams({ page: '1', limit: '50', eventId: String(eventId) })
+      const res = await fetch(`${API_BASE}/snapshots?${params.toString()}`)
+      if (!res.ok) throw new Error('Failed to fetch snapshots')
+      const data = await res.json()
+      const snaps = (data.snapshots || []).filter(s => s.image_url)
+      setSnapshotsCache(prev => ({ ...prev, [eventId]: snaps }))
+      return snaps
+    } catch (e) {
+      console.error('Failed to fetch snapshots for event', eventId, e)
+      return []
+    } finally {
+      setLoadingSnapshots(false)
+    }
+  }
+
+  const openImageViewerForEvent = async (event) => {
+    // Group events at same camera/location for navigation
+    const group = events.filter(e => e.channel_id === event.channel_id)
+      .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+    setEventGroup(group)
+    const idx = group.findIndex(e => e.id === event.id)
+    setCurrentEventIndex(Math.max(0, idx))
+
+    // Preload snapshots for current event
+    await fetchSnapshotsForEvent(event.id)
+
+    setSelectedEvent(event)
+    setImageViewerOpen(true)
+  }
+
+  const goToPrevEvent = async () => {
+    if (currentEventIndex <= 0) return
+    const newIndex = currentEventIndex - 1
+    setCurrentEventIndex(newIndex)
+    const evt = eventGroup[newIndex]
+    setSelectedEvent(evt)
+    await fetchSnapshotsForEvent(evt.id)
+  }
+
+  const goToNextEvent = async () => {
+    if (currentEventIndex >= eventGroup.length - 1) return
+    const newIndex = currentEventIndex + 1
+    setCurrentEventIndex(newIndex)
+    const evt = eventGroup[newIndex]
+    setSelectedEvent(evt)
+    await fetchSnapshotsForEvent(evt.id)
+  }
+
           latestByCam.set(e.channel_id, {
             channel_id: e.channel_id,
             channel_name: e.channel_name,
@@ -211,10 +270,11 @@ export function GeographicMap() {
     return Array.from(latestByCam.values())
   }, [events])
 
-  const handleEventClick = (event) => {
+  const handleEventClick = async (event) => {
     setSelectedEvent(event)
     setMapCenter([event.latitude, event.longitude])
     setMapZoom(16)
+    await openImageViewerForEvent(event)
   }
 
   const formatTimestamp = (timestamp) => {
@@ -497,6 +557,86 @@ export function GeographicMap() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 rounded-full" style={{backgroundColor: eventTypeColors.MotionDetected}} />
+      {/* Image Viewer Dialog */}
+      <Dialog open={imageViewerOpen} onOpenChange={setImageViewerOpen}>
+        <DialogContent className="max-w-4xl w-full">
+          <DialogHeader>
+            <DialogTitle className="flex justify-between items-center w-full">
+              <span>
+                {selectedEvent ? `${selectedEvent.topic} • ${selectedEvent.channel_name}` : 'Event'}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {selectedEvent ? new Date(selectedEvent.start_time).toLocaleString() : ''}
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Event navigation when multiple events at location */}
+          {eventGroup.length > 1 && (
+            <div className="flex items-center justify-between mb-3 text-sm">
+              <Button size="sm" variant="outline" onClick={goToPrevEvent} disabled={currentEventIndex === 0}>
+                Previous event
+              </Button>
+              <div className="text-muted-foreground">
+                Event {currentEventIndex + 1} of {eventGroup.length}
+              </div>
+              <Button size="sm" variant="outline" onClick={goToNextEvent} disabled={currentEventIndex >= eventGroup.length - 1}>
+                Next event
+              </Button>
+            </div>
+          )}
+
+          {/* Carousel of snapshots for the selected event */}
+          <div className="relative">
+            {loadingSnapshots && (
+              <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10 rounded-md">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+              </div>
+            )}
+
+            {selectedEvent && (
+              <Carousel className="w-full">
+                <CarouselContent>
+                  {(snapshotsCache[selectedEvent.id] || []).map((snap) => (
+                    <CarouselItem key={snap.id}>
+                      <div className="flex items-center justify-center bg-black/80 rounded-md overflow-hidden h-[480px]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={snap.image_url}
+                          alt={`${selectedEvent.topic} snapshot`}
+                          className="max-h-full max-w-full object-contain"
+                          loading="lazy"
+                        />
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="-left-4" />
+                <CarouselNext className="-right-4" />
+              </Carousel>
+            )}
+
+            {/* Metadata */}
+            {selectedEvent && (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                <div>
+                  <div className="text-muted-foreground">Camera</div>
+                  <div className="font-medium">{selectedEvent.channel_name}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Type</div>
+                  <div className="font-medium">{selectedEvent.topic}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Snapshots</div>
+                  <div className="font-medium">{(snapshotsCache[selectedEvent.id] || []).length} / {selectedEvent.snapshot_count}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
                   <span>Motion Detected</span>
                 </div>
                 <div className="flex items-center space-x-2">
