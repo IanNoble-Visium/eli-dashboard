@@ -1,14 +1,14 @@
 {
   "version": 2,
   "builds": [
-    { "src": "frontend/package.json", "use": "@vercel/static-build", "config": { "distDir": "frontend/dist", "buildCommand": "cd frontend && npm run build" } },
+    { "src": "frontend/package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } },
     { "src": "api/**/*.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/assets/(.*)", "headers": { "cache-control": "max-age=31536000, immutable" } },
     { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/frontend/dist/index.html" }
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
     "VITE_API_BASE_URL": "/api"
