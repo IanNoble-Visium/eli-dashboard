@@ -13,7 +13,8 @@ export default withCors(async function handler(req, res) {
     const timeRange = req.query.timeRange || '7d'
     const startTs = Math.floor(toMillisAgo(timeRange))
 
-    const where = ['s.created_at >= TO_TIMESTAMP($1 / 1000)']
+    // Filter by recent events via events.start_time (numeric epoch) to avoid created_at type mismatches
+    const where = ['e.start_time >= $1']
     const params = [startTs]
     if (eventId) { where.push(`s.event_id = $${params.length+1}`); params.push(eventId) }
     if (type) { where.push(`s.type = $${params.length+1}`); params.push(type) }

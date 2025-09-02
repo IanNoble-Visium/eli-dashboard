@@ -1,25 +1,52 @@
 # ELI Dashboard - TruContext Intelligence Platform
 
-A comprehensive dashboard application for the ELI demo that visualizes and manages data captured from the IREX system. Built with React (Vite) frontend and Node.js serverless functions on Vercel, integrating with PostgreSQL and Neo4j.
+A comprehensive dashboard application for the ELI demo that visualizes and manages data captured from the IREX system. Built with React (Vite) frontend and Node.js API handlers that work both as local Express server for development and Vercel serverless functions for production, integrating with PostgreSQL and Neo4j.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm/yarn/pnpm
-- Access to PostgreSQL and Neo4j databases
+- Node.js 18+ and npm/pnpm
+- PostgreSQL database (Neon)
+- Neo4j database (Aura)
 
-### Local Development
+### Local Development Setup
 
-#### 1. Frontend Setup
-```bash
-cd frontend
-npm install
-npm run dev
-```
-The frontend will be available at `http://localhost:5173`
+1. **Clone and install dependencies**:
+   ```bash
+   git clone <repository-url>
+   cd eli-dashboard
+   npm install
+   cd frontend && pnpm install
+   ```
 
-#### 2. API (Node serverless) Setup
-API functions run via Vercel. For local development, you can run `vercel dev` or hit the hosted `/api` endpoints once deployed. Ensure Vercel env vars are set (see Environment Variables).
+2. **Configure environment variables**:
+   - Create `.env` in the root directory with your database credentials:
+     ```env
+     POSTGRES_URL=postgresql://user:pass@host/db?sslmode=require
+     NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
+     NEO4J_USERNAME=neo4j
+     NEO4J_PASSWORD=your-password
+     NEO4J_DATABASE=neo4j
+     CORS_ORIGINS=http://localhost:5173
+     PORT=5001
+     ```
+   - Create `frontend/.env.local`:
+     ```env
+     VITE_API_BASE_URL=http://localhost:5001/api
+     ```
+
+3. **Start development servers**:
+   ```bash
+   # Terminal 1: Start local API server (Express)
+   npm run dev:api
+
+   # Terminal 2: Start frontend (Vite)
+   cd frontend && pnpm dev
+   ```
+
+4. **Access the application**:
+   - Frontend: http://localhost:5173
+   - API Health Check: http://localhost:5001/api/dashboard/health
 
 ## 📊 Dashboard Features
 
@@ -54,18 +81,17 @@ API functions run via Vercel. For local development, you can run `vercel dev` or
 - Real-time results with performance metrics
 - Advanced filtering and sorting options
 
-## 🌐 Deployment Options
+## 🌐 Deployment
 
-### Deployment: Vercel Monorepo (Frontend + /api)
-- vercel.json defines builds for `frontend` and `api` and routes `/api/*` to Node functions
-- Set VITE_API_BASE_URL=/api in Vercel env (or keep in vercel.json)
-- Push to main to deploy
+- Local development uses the Express server (npm run dev:api) and Vite (pnpm dev)
+- Production deployment uses Vercel serverless functions under /api and a static frontend
+- The same API handler code is shared across both environments
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-#### API (Serverless):
+#### API (Local & Vercel):
 ```env
 # PostgreSQL
 POSTGRES_URL=postgresql://user:pass@host:port/database
@@ -77,16 +103,22 @@ NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your_password
 NEO4J_DATABASE=neo4j
 
-# Optional CORS
-CORS_ORIGINS=https://your-frontend-domain.vercel.app,https://your-custom-domain.com
+# CORS (comma separated)
+CORS_ORIGINS=http://localhost:5173,https://your-frontend-domain.vercel.app
+
+# Local only
+PORT=5001
 ```
 
-#### Frontend (Environment Variables):
-```env
-VITE_API_BASE_URL=/api
-```
-
-For production, update `VITE_API_BASE_URL` to your deployed backend URL.
+#### Frontend (Environment Variables)
+- Development (local):
+  ```env
+  VITE_API_BASE_URL=http://localhost:5001/api
+  ```
+- Production (Vercel):
+  ```env
+  VITE_API_BASE_URL=/api
+  ```
 
 ## 📁 Project Structure
 
@@ -98,7 +130,7 @@ eli-dashboard/
 │   │   └── App.jsx          # Main application
 │   ├── package.json
 │   └── vite.config.js
-├── api/                      # Node.js Serverless API (Vercel)
+├── api/                      # Node.js API Handlers (serverless-compatible)
 │   ├── _lib/                 # Shared DB/CORS helpers (pg, neo4j)
 │   ├── dashboard/            # Dashboard endpoints (health, metrics, timeline, graph)
 │   ├── events/               # Events endpoints (index, geo, types, cameras, [id])
@@ -121,6 +153,16 @@ eli-dashboard/
 ### Data Endpoints
 - `GET /api/events` - Events with pagination
 - `GET /api/snapshots` - Snapshots with pagination
+- `GET /api/events/types` - Event types with counts
+- `GET /api/events/cameras` - Cameras with event counts
+- `GET /api/events/:id` - Event details by ID
+- `GET /api/snapshots/types` - Snapshot types with counts
+- `GET /api/snapshots/:id` - Snapshot details by ID
+- `GET /api/users` - Users list
+- `POST /api/users` - Create user
+- `GET /api/users/:id` - Get user by ID
+- `PUT /api/users/:id` - Update user by ID
+- `DELETE /api/users/:id` - Delete user by ID
 
 ## 🎯 Live Data Integration
 
@@ -134,7 +176,7 @@ The dashboard connects to your existing ELI Demo system:
 
 ### Adding New Features
 1. Frontend components go in `frontend/src/components/`
-2. API routes go in `api/` (Node serverless), shared helpers in `api/_lib`
+2. API routes go in `api/` (serverless-compatible), shared helpers in `api/_lib`
 
 ### Styling
 - Uses Tailwind CSS for styling
