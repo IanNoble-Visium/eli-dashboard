@@ -1,8 +1,8 @@
-import neo4j from 'neo4j-driver'
+const neo4j = require('neo4j-driver')
 
 let driver
 
-export function getNeo4jDriver() {
+function getNeo4jDriver() {
   if (!driver) {
     const uri = process.env.NEO4J_URI
     const user = process.env.NEO4J_USERNAME
@@ -15,7 +15,7 @@ export function getNeo4jDriver() {
   return driver
 }
 
-export async function runCypher(cypher, params = {}) {
+async function runCypher(cypher, params = {}) {
   const session = getNeo4jDriver().session({ database: process.env.NEO4J_DATABASE || 'neo4j' })
   try {
     const result = await session.run(cypher, params)
@@ -24,4 +24,6 @@ export async function runCypher(cypher, params = {}) {
     await session.close()
   }
 }
+
+module.exports = { getNeo4jDriver, runCypher }
 

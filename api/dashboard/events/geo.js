@@ -1,5 +1,5 @@
-import { withCors } from '../../_lib/cors.js'
-import { query } from '../../_lib/db.js'
+const { withCors } = require('../../_lib/cors.js')
+const { query } = require('../../_lib/db.js')
 
 function toStartTs(range) {
   const now = Date.now()
@@ -9,7 +9,7 @@ function toStartTs(range) {
   return now - 24*60*60*1000
 }
 
-export default withCors(async function handler(req, res) {
+module.exports = withCors(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })
   try {
     const timeRange = req.query.timeRange || '24h'
