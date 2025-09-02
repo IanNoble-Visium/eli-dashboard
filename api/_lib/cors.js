@@ -1,4 +1,4 @@
-export function withCors(handler) {
+function withCors(handler) {
   return async (req, res) => {
     const originsEnv = process.env.CORS_ORIGINS || ''
     const allowed = originsEnv
@@ -21,3 +21,4 @@ export function withCors(handler) {
   }
 }
 
+module.exports = { withCors }
