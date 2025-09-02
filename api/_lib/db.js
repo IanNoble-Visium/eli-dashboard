@@ -1,9 +1,9 @@
-const { Pool } = require('pg')
+import { Pool } from 'pg'
 
 // Create a global cached pool for serverless reuse
 let pool
 
-function getPgPool() {
+export function getPgPool() {
   if (!pool) {
     const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL
     if (!connectionString) {
@@ -14,7 +14,7 @@ function getPgPool() {
   return pool
 }
 
-async function query(text, params = []) {
+export async function query(text, params = []) {
   const client = await getPgPool().connect()
   try {
     const res = await client.query(text, params)
@@ -24,7 +24,7 @@ async function query(text, params = []) {
   }
 }
 
-function toMillisAgo(range) {
+export function toMillisAgo(range) {
   const now = Date.now()
   switch (range) {
     case '30m': return now - 30 * 60 * 1000
@@ -37,6 +37,4 @@ function toMillisAgo(range) {
     default: return now - 24 * 60 * 60 * 1000
   }
 }
-
-module.exports = { getPgPool, query, toMillisAgo }
 

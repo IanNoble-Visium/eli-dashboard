@@ -1,7 +1,7 @@
-const { withCors } = require('../_lib/cors.js')
-const { query, toMillisAgo } = require('../_lib/db.js')
+import { withCors } from '../_lib/cors.js'
+import { query, toMillisAgo } from '../_lib/db.js'
 
-module.exports = withCors(async function handler(req, res) {
+export default withCors(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })
   try {
     const limit = Math.min(parseInt(req.query.limit || '1000', 10), 2000)
