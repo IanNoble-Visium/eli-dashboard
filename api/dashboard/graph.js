@@ -1,7 +1,7 @@
-const { withCors } = require('../_lib/cors.js')
-const { runCypher } = require('../_lib/neo4j.js')
+import { withCors } from '../_lib/cors.js'
+import { runCypher } from '../_lib/neo4j.js'
 
-module.exports = withCors(async function handler(req, res) {
+export default withCors(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })
   try {
     const limit = Math.min(parseInt(req.query.limit || '100', 10), 1000)

@@ -1,7 +1,7 @@
-const { withCors } = require('../_lib/cors.js')
-const { query } = require('../_lib/db.js')
+import { withCors } from '../_lib/cors.js'
+import { query } from '../_lib/db.js'
 
-module.exports = withCors(async function handler(req, res) {
+export default withCors(async function handler(req, res) {
   const { id } = req.query
   try {
     if (req.method === 'GET') {
