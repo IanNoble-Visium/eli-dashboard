@@ -6,7 +6,7 @@
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist",
-        "installCommand": "npm install --legacy-peer-deps"
+        "installCommand": "pnpm install --no-frozen-lockfile"
       }
     },
     { "src": "api/**/*.js", "use": "@vercel/node" }
