@@ -96,14 +96,14 @@ export default function FloatingWindow({
 
   return (
     <div
-      className={`fixed z-[60] shadow-xl border rounded-md bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 ${className}`}
+      className={`fixed z-[60] shadow-xl border rounded-md bg-background backdrop-blur-sm ${className}`}
       style={style}
       role="dialog"
       aria-modal="false"
       data-floating-window="true"
     >
       <div
-        className="cursor-move flex items-center justify-between px-3 py-2 border-b bg-muted/60"
+        className="cursor-move flex items-center justify-between px-3 py-2 border-b bg-muted"
         onMouseDown={onDragStart}
       >
         <div className="font-medium truncate pr-2 select-none">{title}</div>

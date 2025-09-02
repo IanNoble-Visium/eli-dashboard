@@ -303,6 +303,17 @@ export function GeographicMap() {
     }, 350)
   }
 
+  const cancelHoverFetch = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
+    if (hoverAbortRef.current) {
+      hoverAbortRef.current.abort()
+      hoverAbortRef.current = null
+    }
+  }
+
     setSelectedEvent(evt)
     await fetchSnapshotsForEvent(evt.id)
   }
@@ -538,7 +549,7 @@ export function GeographicMap() {
                         }}
                       >
                         <Tooltip direction="top" offset={[0, -10]} opacity={1} sticky={false} permanent={false}>
-                          <div className="bg-background/95 border rounded shadow p-1">
+                          <div className="bg-background border rounded shadow p-1">
                             {(() => {
                               const key = `${event.latitude},${event.longitude}`
                               const url = hoverThumbCache[key]
