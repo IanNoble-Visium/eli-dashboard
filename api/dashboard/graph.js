@@ -1,5 +1,5 @@
-import { withCors } from '../_lib/cors'
-import { runCypher } from '../_lib/neo4j'
+import { withCors } from '../_lib/cors.js'
+import { runCypher } from '../_lib/neo4j.js'
 
 export default withCors(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })

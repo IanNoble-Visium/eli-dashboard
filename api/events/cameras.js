@@ -1,5 +1,5 @@
-import { withCors } from '../_lib/cors'
-import { query } from '../_lib/db'
+import { withCors } from '../_lib/cors.js'
+import { query } from '../_lib/db.js'
 
 export default withCors(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })
