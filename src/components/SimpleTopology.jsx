@@ -3,7 +3,6 @@ import ForceGraph2D from 'react-force-graph-2d'
 import {
   Network,
   Camera,
-  Image,
   Tag,
   Activity,
   RefreshCw,
@@ -50,6 +49,7 @@ export function SimpleTopology() {
   const [error, setError] = useState(null)
   const [timeRange, setTimeRange] = useState('30m')
   const graphRef = useRef()
+  const imageCacheRef = useRef(new Map())
 
   const colorForType = (type) => nodeConfig[type]?.color || nodeConfig.default.color
   const sizeForType = (type) => nodeConfig[type]?.size || nodeConfig.default.size
@@ -352,7 +352,7 @@ export function SimpleTopology() {
                   onNodeClick={handleNodeClick}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     const label = node.name
-                    const fontSize = 12/globalScale
+                    const fontSize = 12 / globalScale
                     ctx.font = `${fontSize}px Sans-Serif`
 
                     // Draw node
@@ -363,13 +363,31 @@ export function SimpleTopology() {
 
                     // Optionally draw thumbnail images for snapshot nodes
                     if (showImages && node.type === 'Image' && node.properties?.image_url) {
-                      const img = new Image()
-                      img.crossOrigin = 'anonymous'
-                      img.onload = () => {
-                        const size = Math.max(10, node.size * 2)
-                        ctx.drawImage(img, node.x - size/2, node.y - size/2, size, size)
+                      const url = node.properties.image_url
+                      let img = imageCacheRef.current.get(url)
+
+                      if (!img) {
+                        img = new window.Image()
+                        img.crossOrigin = 'anonymous'
+                        img.onload = () => {
+                          imageCacheRef.current.set(url, img)
+                          if (graphRef.current) {
+                            try { graphRef.current.refresh() } catch (_) {}
+                          }
+                        }
+                        img.onerror = () => {
+                          imageCacheRef.current.set(url, 'error')
+                        }
+                        img.src = url
+                        imageCacheRef.current.set(url, img)
                       }
-                      img.src = node.properties.image_url
+
+                      if (img && img !== 'error' && img.complete) {
+                        const size = Math.max(10, node.size * 2)
+                        try {
+                          ctx.drawImage(img, node.x - size / 2, node.y - size / 2, size, size)
+                        } catch (_) {}
+                      }
                     }
                   }}
                 />

@@ -30,6 +30,19 @@ import usersIndex from './users/index.js'
 import userById from './users/[id].js'
 
 const app = express()
+// Basic process-level error logging to avoid silent crashes in dev
+process.on('unhandledRejection', (reason) => {
+  console.error('[dev:api] Unhandled Rejection:', reason)
+})
+process.on('uncaughtException', (err) => {
+  console.error('[dev:api] Uncaught Exception:', err)
+})
+
+if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
+  console.warn('[dev:api] Warning: POSTGRES_URL/DATABASE_URL is not set. API will run but DB-backed endpoints will return 500.')
+}
+
+
 
 // Body parsers
 app.use(express.json({ limit: '1mb' }))
