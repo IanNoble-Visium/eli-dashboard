@@ -12,7 +12,7 @@
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/assets/(.*)", "headers": { "cache-control": "max-age=31536000, immutable" }, "continue": true },
     { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/frontend/dist/index.html", "status": 200 }
+    { "src": "/(.*)", "dest": "/index.html", "status": 200 }
   ],
   "build": {
     "env": {
