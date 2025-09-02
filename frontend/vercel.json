@@ -1,5 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "note": "Monorepo vercel.json lives at repo root. This file is not used."
-}
-

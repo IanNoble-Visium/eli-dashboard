@@ -1,0 +1,1 @@
+python ..\@BACKUP\app.py -d %1
