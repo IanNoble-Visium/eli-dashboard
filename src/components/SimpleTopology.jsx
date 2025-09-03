@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import {
   Network,
@@ -16,7 +16,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import TimeRangeSelector from '@/components/TimeRangeSelector'
+import { useTimeRange } from '@/context/TimeRangeContext'
 
 
 // Node type colors and sizes
@@ -38,7 +39,7 @@ const edgeConfig = {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 
-export function SimpleTopology() {
+function SimpleTopology() {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] })
   const [selectedNode, setSelectedNode] = useState(null)
   const [showImages, setShowImages] = useState(true)
@@ -47,7 +48,7 @@ export function SimpleTopology() {
   const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [timeRange, setTimeRange] = useState('30m')
+  const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const graphRef = useRef()
   const imageCacheRef = useRef(new Map())
 
@@ -127,10 +128,20 @@ export function SimpleTopology() {
     try {
       setLoading(true)
       setError(null)
-      const params = new URLSearchParams({ page: '1', limit: '200', timeRange })
+      const params = new URLSearchParams({ page: '1', limit: '200' })
+      const cameraParams = new URLSearchParams()
+      if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
+        params.set('start', String(debouncedAbsoluteRange.start))
+        params.set('end', String(debouncedAbsoluteRange.end))
+        cameraParams.set('start', String(debouncedAbsoluteRange.start))
+        cameraParams.set('end', String(debouncedAbsoluteRange.end))
+      } else {
+        params.set('timeRange', debouncedTimeRange)
+        cameraParams.set('timeRange', debouncedTimeRange)
+      }
       const [eventsRes, camsRes, snapsRes] = await Promise.all([
         fetch(`${API_BASE}/events?${params.toString()}`),
-        fetch(`${API_BASE}/events/cameras`),
+        fetch(`${API_BASE}/events/cameras?${cameraParams.toString()}`),
         fetch(`${API_BASE}/snapshots?${params.toString()}`)
       ])
       if (!eventsRes.ok || !camsRes.ok || !snapsRes.ok) throw new Error('Failed to fetch graph data')
@@ -154,7 +165,7 @@ export function SimpleTopology() {
     const onRefresh = () => fetchGraphData()
     window.addEventListener('dashboard-refresh', onRefresh)
     return () => window.removeEventListener('dashboard-refresh', onRefresh)
-  }, [timeRange])
+  }, [debouncedTimeRange, debouncedAbsoluteRange])
 
 
   const handleNodeClick = (node) => {
@@ -204,27 +215,6 @@ export function SimpleTopology() {
   const nodeStats = getNodeStats()
   const edgeStats = getEdgeStats()
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Network Topology</h1>
-          <div className="animate-pulse bg-muted h-10 w-32 rounded" />
-        </div>
-
-            <div className="flex items-center space-x-2">
-              <Button onClick={fetchGraphData} variant="outline" size="sm">
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-              {error && (
-                <span className="text-xs text-destructive">{error}</span>
-              )}
-            </div>
-
-        <div className="h-96 bg-muted rounded-lg animate-pulse" />
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">
@@ -258,20 +248,7 @@ export function SimpleTopology() {
           <CardTitle className="flex items-center space-x-2">
             <div>
               <label className="text-sm font-medium mb-2 block">Time Range</label>
-              <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Time Range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30m">Last 30 minutes</SelectItem>
-                  <SelectItem value="1h">Last 1 hour</SelectItem>
-                  <SelectItem value="4h">Last 4 hours</SelectItem>
-                  <SelectItem value="12h">Last 12 hours</SelectItem>
-                  <SelectItem value="24h">Last 24h</SelectItem>
-                  <SelectItem value="7d">Last 7 days</SelectItem>
-                  <SelectItem value="30d">Last 30 days</SelectItem>
-                </SelectContent>
-              </Select>
+              <TimeRangeSelector />
             </div>
 
             <Settings className="w-5 h-5" />
@@ -336,7 +313,15 @@ export function SimpleTopology() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-96 rounded-lg overflow-hidden border">
+              <div className="h-96 rounded-lg overflow-hidden border relative">
+                {loading && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
+                      <p>Loading topology data...</p>
+                    </div>
+                  </div>
+                )}
                 <ForceGraph2D
                   ref={graphRef}
                   graphData={graphData}
@@ -487,4 +472,6 @@ export function SimpleTopology() {
     </div>
   )
 }
+
+export default memo(SimpleTopology)
 

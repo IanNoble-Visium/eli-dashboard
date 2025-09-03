@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet'
 import {
   MapPin,
@@ -20,6 +20,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import FloatingWindow from '@/components/ui/floating-window'
 import { Badge } from '@/components/ui/badge'
+import TimeRangeSelector from '@/components/TimeRangeSelector'
+import { useTimeRange } from '@/context/TimeRangeContext'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LayersControl } from 'react-leaflet'
 import { Input } from '@/components/ui/input'
@@ -72,17 +74,18 @@ export function GeographicMap() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [timeRange, setTimeRange] = useState('30m')
+  const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const [eventType, setEventType] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [cameras, setCameras] = useState([])
+  // const [cameras, setCameras] = useState([]) // kept for future: used in Map statistics
 
   const [mapCenter, setMapCenter] = useState([-12.0962697115117, -77.0260798931122]) // Lima, Peru
   const [mapZoom, setMapZoom] = useState(13)
   // Hover thumbnail cache: { `${lat},${lng}`: url }
-  const [hoverThumbCache, setHoverThumbCache] = useState({})
-  const hoverAbortRef = useRef(null)
-  const hoverTimeoutRef = useRef(null)
+  // Hover thumbnails disabled for now to reduce extra API traffic
+  // const [hoverThumbCache, setHoverThumbCache] = useState({})
+  // const hoverAbortRef = useRef(null)
+  // const hoverTimeoutRef = useRef(null)
 
   const [imageViewerOpen, setImageViewerOpen] = useState(false)
   const [eventGroup, setEventGroup] = useState([])
@@ -103,34 +106,54 @@ export function GeographicMap() {
 
   const [selectedEvent, setSelectedEvent] = useState(null)
   const mapRef = useRef()
+  const firstLoadRef = useRef(true)
+  const inFlightRef = useRef(false)
+  const lastQueryRef = useRef('')
 
-  // Debug logging
-  console.log('GeographicMap component rendered', {
-    loading,
-    error,
-    eventsCount: events.length,
-    mapCenter,
-    API_BASE
-  })
+  // Debug logging (only in development)
+  if (import.meta.env.DEV) {
+    console.log('GeographicMap component rendered', {
+      loading,
+      error,
+      eventsCount: events.length,
+      mapCenter,
+      API_BASE
+    })
+  }
 
-  const fetchGeoEvents = async () => {
+  const fetchGeoEvents = useCallback(async () => {
     try {
-      console.log('🔄 Starting fetchGeoEvents...')
+      // Build query string first to dedupe identical requests
+      const params = new URLSearchParams({ limit: '1000' })
+      if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
+        params.set('start', String(debouncedAbsoluteRange.start))
+        params.set('end', String(debouncedAbsoluteRange.end))
+      } else {
+        params.set('timeRange', timeRange)
+      }
+      if (eventType && eventType !== 'all') params.append('eventType', eventType)
+      const url = `${API_BASE}/events/geo?${params}`
+
+      // Skip if same as last query and a request is already in-flight
+      if (inFlightRef.current && lastQueryRef.current === url) {
+        if (import.meta.env.DEV) console.log('⏭️ Skipping duplicate in-flight request')
+        return
+      }
+
+      lastQueryRef.current = url
+      inFlightRef.current = true
+
+      if (import.meta.env.DEV) {
+        console.log('🔄 Starting fetchGeoEvents...')
+        console.log('📡 Fetching from URL:', url)
+      }
       setLoading(true)
       setError(null)
 
-      const params = new URLSearchParams({
-        timeRange,
-        limit: '1000'
-      })
-
-      if (eventType && eventType !== 'all') params.append('eventType', eventType)
-
-      const url = `${API_BASE}/events/geo?${params}`
-      console.log('📡 Fetching from URL:', url)
-
       const response = await fetch(url)
-      console.log('📥 Response status:', response.status, response.statusText)
+      if (import.meta.env.DEV) {
+        console.log('📥 Response status:', response.status, response.statusText)
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -139,72 +162,75 @@ export function GeographicMap() {
       }
 
       const data = await response.json()
-      console.log('✅ Received data:', data)
-      console.log('📊 Events count:', data.events?.length || 0)
+      if (import.meta.env.DEV) {
+        console.log('✅ Received data:', data)
+        console.log('📊 Events count:', data.events?.length || 0)
+      }
 
-      setEvents(data.events || [])
+      setEvents((prev) => {
+        // Avoid setState thrash by checking reference sizes
+        const next = data.events || []
+        if (prev.length === next.length) return prev
+        return next
+      })
 
-      // Auto-center map on first event if available
-      if (data.events && data.events.length > 0 && !selectedEvent) {
+      // Auto-center only once on the very first successful load
+      if (firstLoadRef.current && data.events && data.events.length > 0) {
         const firstEvent = data.events[0]
-        console.log('🎯 Setting map center to first event:', firstEvent)
+        if (import.meta.env.DEV) {
+          console.log('🎯 First load: setting map center to first event:', firstEvent)
+        }
         setMapCenter([firstEvent.latitude, firstEvent.longitude])
+        firstLoadRef.current = false
       }
 
     } catch (err) {
       console.error('❌ Geographic events fetch error:', err)
       setError(err.message)
     } finally {
-      console.log('🏁 fetchGeoEvents completed, setting loading to false')
-      setLoading(false)
-    }
-  }
-
-  const fetchCameras = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/events/cameras`)
-      if (res.ok) {
-        const data = await res.json()
-        setCameras(data.cameras || [])
+      if (import.meta.env.DEV) {
+        console.log('🏁 fetchGeoEvents completed, setting loading to false')
       }
-    } catch (err) {
-      console.error('Camera fetch error:', err)
+      setLoading(false)
+      inFlightRef.current = false
     }
-  }
+  }, [debouncedAbsoluteRange, timeRange, eventType])
+
+  // const fetchCameras = async () => {
+  //   try {
+  //     const res = await fetch(`${API_BASE}/events/cameras`)
+  //     if (res.ok) {
+  //       const data = await res.json()
+  //       setCameras(data.cameras || [])
+  //     }
+  //   } catch (err) {
+  //     console.error('Camera fetch error:', err)
+  //   }
+  // }
 
   useEffect(() => {
-    console.log('🔄 useEffect triggered - fetching data...')
-    console.log('🌐 API_BASE:', API_BASE)
-    console.log('⚙️ Environment check:', {
-      NODE_ENV: import.meta.env.NODE_ENV,
-      VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL
-    })
+    if (import.meta.env.DEV) {
+      console.log('🔄 useEffect triggered - fetching data...')
+      console.log('🌐 API_BASE:', API_BASE)
+    }
 
-    // Test basic connectivity
-    fetch(`${API_BASE}/events/geo?timeRange=30m&limit=5`)
-      .then(res => {
-        console.log('🧪 Test fetch response:', res.status, res.statusText)
-        return res.json()
-      })
-      .then(data => {
-        console.log('🧪 Test fetch data:', data)
-      })
-      .catch(err => {
-        console.error('🧪 Test fetch error:', err)
-      })
+    // Optional connectivity check in dev only, gated by env flag
+    if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_FETCH === 'true') {
+      fetch(`${API_BASE}/events/geo?timeRange=30m&limit=5`).then(() => {}).catch(() => {})
+    }
 
     fetchGeoEvents()
-    fetchCameras()
-  }, [timeRange, eventType])
+    // fetchCameras()
+  }, [fetchGeoEvents])
 
   useEffect(() => {
     const handleRefresh = () => {
       fetchGeoEvents()
-      fetchCameras()
+      // fetchCameras()
     }
     window.addEventListener('dashboard-refresh', handleRefresh)
     return () => window.removeEventListener('dashboard-refresh', handleRefresh)
-  }, [timeRange, eventType])
+  }, [fetchGeoEvents])
 
   const filteredEvents = events.filter(event => {
     if (!searchTerm) return true
@@ -276,43 +302,6 @@ export function GeographicMap() {
     const newIndex = currentEventIndex - 1
     setCurrentEventIndex(newIndex)
     const evt = eventGroup[newIndex]
-  // Hover: debounce fetch of first snapshot for marker
-  const requestHoverThumb = (eventObj) => {
-    const key = `${eventObj.latitude},${eventObj.longitude}`
-    if (hoverThumbCache[key]) return
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
-
-    hoverTimeoutRef.current = setTimeout(async () => {
-      try {
-        if (hoverAbortRef.current) hoverAbortRef.current.abort()
-        hoverAbortRef.current = new AbortController()
-        const res = await fetch(`${API_BASE}/snapshots?eventId=${encodeURIComponent(eventObj.id)}&limit=1`, {
-          signal: hoverAbortRef.current.signal
-        })
-
-
-        if (!res.ok) return
-        const data = await res.json()
-        const first = (data.snapshots || []).find(s => s.image_url)
-        if (first?.image_url) {
-          setHoverThumbCache(prev => ({ ...prev, [key]: first.image_url }))
-        }
-      } catch (_) {
-        // ignore aborts
-      }
-    }, 350)
-  }
-
-  const cancelHoverFetch = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current)
-      hoverTimeoutRef.current = null
-    }
-    if (hoverAbortRef.current) {
-      hoverAbortRef.current.abort()
-      hoverAbortRef.current = null
-    }
-  }
 
     setSelectedEvent(evt)
     await fetchSnapshotsForEvent(evt.id)
@@ -338,17 +327,6 @@ export function GeographicMap() {
     return new Date(timestamp).toLocaleString()
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Geographic Map View</h1>
-          <div className="animate-pulse bg-muted h-10 w-32 rounded"></div>
-        </div>
-        <div className="h-96 bg-muted rounded-lg animate-pulse"></div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">
@@ -386,20 +364,7 @@ export function GeographicMap() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Time Range</label>
-              <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30m">Last 30 minutes</SelectItem>
-                  <SelectItem value="1h">Last 1 hour</SelectItem>
-                  <SelectItem value="4h">Last 4 hours</SelectItem>
-                  <SelectItem value="12h">Last 12 hours</SelectItem>
-                  <SelectItem value="24h">Last 24 hours</SelectItem>
-                  <SelectItem value="7d">Last 7 days</SelectItem>
-                  <SelectItem value="30d">Last 30 days</SelectItem>
-                </SelectContent>
-              </Select>
+              <TimeRangeSelector />
             </div>
 
             <div>
@@ -544,20 +509,14 @@ export function GeographicMap() {
                         icon={createCustomIcon(eventTypeColors[event.topic] || eventTypeColors.default)}
                         eventHandlers={{
                           click: () => handleEventClick(event),
-                          mouseover: () => requestHoverThumb(event),
-                          mouseout: () => cancelHoverFetch()
+                          // Hover thumbnails disabled for now to reduce extra API calls
                         }}
                       >
                         <Tooltip direction="top" offset={[0, -10]} opacity={1} sticky={false} permanent={false}>
                           <div className="bg-background border rounded shadow p-1">
                             {(() => {
-                              const key = `${event.latitude},${event.longitude}`
-                              const url = hoverThumbCache[key]
-                              return url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={url} alt="thumb" style={{ width: 150, height: 100, objectFit: 'cover' }} loading="lazy" />
-                              ) : (
-                                <div className="w-[150px] h-[100px] grid place-items-center text-xs text-muted-foreground">Preview…</div>
+                              return (
+                                <div className="w-[150px] h-[100px] grid place-items-center text-xs text-muted-foreground">Event</div>
                               )
                             })()}
                           </div>
@@ -805,4 +764,6 @@ export function GeographicMap() {
     </div>
   )
 }
+
+export default memo(GeographicMap)
 

@@ -1,45 +1,47 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { RealTimeUpdates } from './RealTimeUpdates'
-import { 
-  Activity, 
-  Camera, 
-  MapPin, 
-  Image, 
-  TrendingUp, 
+import {
+  Activity,
+  Camera,
+  MapPin,
+  Image,
+  TrendingUp,
   TrendingDown,
   AlertTriangle,
   CheckCircle,
   Clock,
-  Eye
+  Eye,
+  RefreshCw
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
-  LineChart, 
-  Line, 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  PieChart, 
-  Pie, 
+import TimeRangeSelector from '@/components/TimeRangeSelector'
+import { useTimeRange } from '@/context/TimeRangeContext'
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
   Cell,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
 } from 'recharts'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 
-export function ExecutiveDashboard() {
+function ExecutiveDashboard() {
   const [metrics, setMetrics] = useState(null)
   const [timeline, setTimeline] = useState([])
-  const [timeRange, setTimeRange] = useState('30m')
+  const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -48,14 +50,22 @@ export function ExecutiveDashboard() {
       setLoading(true)
       setError(null)
 
+      const baseParams = new URLSearchParams()
+      if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
+        baseParams.set('start', String(debouncedAbsoluteRange.start))
+        baseParams.set('end', String(debouncedAbsoluteRange.end))
+      } else {
+        baseParams.set('timeRange', debouncedTimeRange)
+      }
+
       // Fetch metrics
-      const metricsResponse = await fetch(`${API_BASE}/dashboard/metrics?timeRange=${timeRange}`)
+      const metricsResponse = await fetch(`${API_BASE}/dashboard/metrics?${baseParams.toString()}`)
       if (!metricsResponse.ok) throw new Error('Failed to fetch metrics')
       const metricsData = await metricsResponse.json()
       setMetrics(metricsData)
 
       // Fetch timeline data
-      const timelineResponse = await fetch(`${API_BASE}/dashboard/timeline?timeRange=${timeRange}`)
+      const timelineResponse = await fetch(`${API_BASE}/dashboard/timeline?${baseParams.toString()}`)
       if (!timelineResponse.ok) throw new Error('Failed to fetch timeline')
       const timelineData = await timelineResponse.json()
       setTimeline(timelineData.data || [])
@@ -70,38 +80,16 @@ export function ExecutiveDashboard() {
 
   useEffect(() => {
     fetchDashboardData()
-    
-    // Auto-refresh every 5 minutes (300 seconds)
+
     const interval = setInterval(fetchDashboardData, 300000)
-    
-    // Listen for real-time events to trigger refresh
-    const handleDashboardRefresh = () => {
-      fetchDashboardData()
-    }
-    
+    const handleDashboardRefresh = () => { fetchDashboardData() }
     window.addEventListener('dashboard-refresh', handleDashboardRefresh)
-    
     return () => {
       clearInterval(interval)
       window.removeEventListener('dashboard-refresh', handleDashboardRefresh)
     }
-  }, [timeRange])
+  }, [debouncedTimeRange, debouncedAbsoluteRange])
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Executive Dashboard</h1>
-          <div className="animate-pulse bg-muted h-10 w-32 rounded"></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="animate-pulse bg-muted h-32 rounded-lg"></div>
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   if (error) {
     return (
@@ -179,22 +167,8 @@ export function ExecutiveDashboard() {
           </p>
         </div>
         
-        <div className="flex items-center space-x-4">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="30m">Last 30 minutes</SelectItem>
-              <SelectItem value="1h">Last 1 hour</SelectItem>
-              <SelectItem value="4h">Last 4 hours</SelectItem>
-              <SelectItem value="12h">Last 12 hours</SelectItem>
-              <SelectItem value="24h">Last 24h</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
-          
+        <div className="flex items-center space-x-4 w-full">
+          <TimeRangeSelector className="flex-1" />
           <Badge variant="outline" className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span>Live</span>
@@ -204,21 +178,36 @@ export function ExecutiveDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {kpiCards.map((kpi, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
-              <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpi.value.toLocaleString()}</div>
-              <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                <span>{kpi.change}</span>
-                <span>{kpi.changeLabel}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {loading ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <Card key={index}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="animate-pulse bg-muted h-4 w-20 rounded" />
+                <div className="animate-pulse bg-muted h-4 w-4 rounded" />
+              </CardHeader>
+              <CardContent>
+                <div className="animate-pulse bg-muted h-8 w-16 rounded mb-2" />
+                <div className="animate-pulse bg-muted h-3 w-24 rounded" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          kpiCards.map((kpi, index) => (
+            <Card key={index}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
+                <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{kpi.value.toLocaleString()}</div>
+                <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                  <span>{kpi.change}</span>
+                  <span>{kpi.changeLabel}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Charts Row */}
@@ -231,7 +220,15 @@ export function ExecutiveDashboard() {
               Breakdown of event types in the selected time period
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative">
+            {loading && (
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                <div className="text-center">
+                  <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
+                  <p>Loading chart data...</p>
+                </div>
+              </div>
+            )}
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -262,12 +259,20 @@ export function ExecutiveDashboard() {
               Most active cameras by event count
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative">
+            {loading && (
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                <div className="text-center">
+                  <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
+                  <p>Loading chart data...</p>
+                </div>
+              </div>
+            )}
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={cameraActivityData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
+                <XAxis
+                  dataKey="name"
                   angle={-45}
                   textAnchor="end"
                   height={80}
@@ -283,7 +288,7 @@ export function ExecutiveDashboard() {
       </div>
 
       {/* Timeline Chart */}
-      {timeline.length > 0 && (
+      {(timeline.length > 0 || loading) && (
         <Card>
           <CardHeader>
             <CardTitle>Event Timeline</CardTitle>
@@ -291,24 +296,32 @@ export function ExecutiveDashboard() {
               Event activity over time in the selected period
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative">
+            {loading && (
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                <div className="text-center">
+                  <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
+                  <p>Loading timeline data...</p>
+                </div>
+              </div>
+            )}
             <ResponsiveContainer width="100%" height={400}>
               <AreaChart data={timeline}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="time_bucket" 
+                <XAxis
+                  dataKey="time_bucket"
                   tickFormatter={(value) => new Date(value).toLocaleDateString()}
                 />
                 <YAxis />
-                <Tooltip 
+                <Tooltip
                   labelFormatter={(value) => new Date(value).toLocaleString()}
                 />
                 <Legend />
-                <Area 
-                  type="monotone" 
-                  dataKey="event_count" 
-                  stroke="hsl(var(--primary))" 
-                  fill="hsl(var(--primary))" 
+                <Area
+                  type="monotone"
+                  dataKey="event_count"
+                  stroke="hsl(var(--primary))"
+                  fill="hsl(var(--primary))"
                   fillOpacity={0.3}
                   name="Events"
                 />
@@ -389,4 +402,6 @@ export function ExecutiveDashboard() {
     </div>
   )
 }
+
+export default memo(ExecutiveDashboard)
 

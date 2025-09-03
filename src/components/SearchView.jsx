@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { 
   Card, 
   CardContent, 
@@ -149,7 +149,7 @@ const sampleSnapshots = [
 // Combine all searchable data
 const allData = [...sampleEvents, ...sampleSnapshots]
 
-export function SearchView() {
+function SearchView() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searchType, setSearchType] = useState('all')
@@ -508,4 +508,6 @@ export function SearchView() {
     </div>
   )
 }
+
+export default memo(SearchView)
 

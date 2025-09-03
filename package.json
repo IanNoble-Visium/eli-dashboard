@@ -8,10 +8,11 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:api": "node --experimental-specifier-resolution=node ./api/devServer.js",
+    "dev:all": "powershell -NoProfile -Command \"Start-Process -NoNewWindow -FilePath npm -ArgumentList 'run dev' ; Start-Sleep -Milliseconds 800 ; Start-Process -NoNewWindow -FilePath npm -ArgumentList 'run dev:api' ; Wait-Process -Name node,vite\"",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint .",
-    "dev:api": "node --experimental-specifier-resolution=node ./api/devServer.js"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

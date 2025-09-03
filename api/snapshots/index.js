@@ -10,12 +10,22 @@ export default withCors(async function handler(req, res) {
 
     const eventId = req.query.eventId
     const type = req.query.type
+
+    const startParam = req.query.start ? parseInt(req.query.start, 10) : null
+    const endParam = req.query.end ? parseInt(req.query.end, 10) : null
     const timeRange = req.query.timeRange || '7d'
-    const startTs = Math.floor(toMillisAgo(timeRange))
 
     // Filter by recent events via events.start_time (numeric epoch) to avoid created_at type mismatches
-    const where = ['e.start_time >= $1']
-    const params = [startTs]
+    const where = []
+    const params = []
+    if (startParam && endParam) {
+      where.push('e.start_time >= $1 AND e.start_time <= $2')
+      params.push(startParam, endParam)
+    } else {
+      const startTs = Math.floor(toMillisAgo(timeRange))
+      where.push('e.start_time >= $1')
+      params.push(startTs)
+    }
     if (eventId) { where.push(`s.event_id = $${params.length+1}`); params.push(eventId) }
     if (type) { where.push(`s.type = $${params.length+1}`); params.push(type) }
 

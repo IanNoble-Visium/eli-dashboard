@@ -5,18 +5,28 @@ export default withCors(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })
   try {
     const limit = Math.min(parseInt(req.query.limit || '1000', 10), 2000)
-    const timeRange = req.query.timeRange || '24h'
     const eventType = req.query.eventType
 
-    const startTs = Math.floor(toMillisAgo(timeRange))
+    const startParam = req.query.start ? parseInt(req.query.start, 10) : null
+    const endParam = req.query.end ? parseInt(req.query.end, 10) : null
+    const timeRange = req.query.timeRange || '24h'
+
     const where = [
-      'start_time >= $1',
       'latitude IS NOT NULL',
       'longitude IS NOT NULL',
       'latitude BETWEEN -90 AND 90',
       'longitude BETWEEN -180 AND 180'
     ]
-    const params = [startTs]
+    const params = []
+
+    if (startParam && endParam) {
+      where.unshift('start_time >= $1 AND start_time <= $2')
+      params.push(startParam, endParam)
+    } else {
+      const startTs = Math.floor(toMillisAgo(timeRange))
+      where.unshift('start_time >= $1')
+      params.push(startTs)
+    }
 
     if (eventType) { where.push(`topic = $${params.length+1}`); params.push(eventType) }
 

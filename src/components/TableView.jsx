@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import {
   Table,
   TableBody,
@@ -17,13 +17,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
+import TimeRangeSelector from '@/components/TimeRangeSelector'
+import { useTimeRange } from '@/context/TimeRangeContext'
 import {
   Dialog,
   DialogContent,
@@ -156,7 +151,7 @@ const sampleSnapshots = [
   }
 ]
 
-export function TableView() {
+function TableView() {
   const [activeTab, setActiveTab] = useState('events')
   const [events, setEvents] = useState([])
   const [snapshots, setSnapshots] = useState([])
@@ -168,7 +163,7 @@ export function TableView() {
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
-  const [timeRange, setTimeRange] = useState('30m')
+  const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
 
   // Fetch data from API (with fallback to sample data)
   const fetchData = async (page = 1, limit = 10) => {
@@ -176,7 +171,13 @@ export function TableView() {
       setLoading(true)
       setError(null)
 
-      const params = new URLSearchParams({ page: String(page), limit: String(limit), timeRange })
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+      if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
+        params.set('start', String(debouncedAbsoluteRange.start))
+        params.set('end', String(debouncedAbsoluteRange.end))
+      } else {
+        params.set('timeRange', debouncedTimeRange)
+      }
 
       // Fetch real data from API
       const [eventsResponse, snapshotsResponse] = await Promise.all([
@@ -207,13 +208,13 @@ export function TableView() {
 
   useEffect(() => {
     fetchData()
-  }, [timeRange])
+  }, [debouncedTimeRange, debouncedAbsoluteRange])
 
   useEffect(() => {
     const handleRefresh = () => fetchData()
     window.addEventListener('dashboard-refresh', handleRefresh)
     return () => window.removeEventListener('dashboard-refresh', handleRefresh)
-  }, [timeRange])
+  }, [debouncedTimeRange, debouncedAbsoluteRange])
 
   // Filter and search logic
   const filteredEvents = events.filter(event => {
@@ -295,20 +296,7 @@ export function TableView() {
           </Badge>
 
 
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Time Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="30m">Last 30 minutes</SelectItem>
-              <SelectItem value="1h">Last 1 hour</SelectItem>
-              <SelectItem value="4h">Last 4 hours</SelectItem>
-              <SelectItem value="12h">Last 12 hours</SelectItem>
-              <SelectItem value="24h">Last 24h</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
+          <TimeRangeSelector />
 
           <Button onClick={() => fetchData(currentPage, itemsPerPage)} variant="outline" size="sm" disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -644,4 +632,6 @@ export function TableView() {
     </div>
   )
 }
+
+export default memo(TableView)
 

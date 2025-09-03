@@ -11,14 +11,25 @@ export default withCors(async function handler(req, res) {
     const search = (req.query.search || '').trim()
     const eventType = req.query.eventType
     const cameraId = req.query.cameraId
+
+    const startParam = req.query.start ? parseInt(req.query.start, 10) : null
+    const endParam = req.query.end ? parseInt(req.query.end, 10) : null
     const timeRange = req.query.timeRange || '7d'
 
-    const startTs = Math.floor(toMillisAgo(timeRange))
-    const where = ['start_time >= $1']
-    const params = [startTs]
+    let where = []
+    let params = []
+    if (startParam && endParam) {
+      where.push('start_time >= $1 AND start_time <= $2')
+      params.push(startParam, endParam)
+    } else {
+      const startTs = Math.floor(toMillisAgo(timeRange))
+      where.push('start_time >= $1')
+      params.push(startTs)
+    }
 
     if (search) {
-      where.push('(id::text ILIKE $2 OR topic ILIKE $2 OR channel_name ILIKE $2)')
+      const idx = params.length + 1
+      where.push(`(id::text ILIKE $${idx} OR topic ILIKE $${idx} OR channel_name ILIKE $${idx})`)
       params.push(`%${search}%`)
     }
     if (eventType) { where.push(`topic = $${params.length+1}`); params.push(eventType) }
