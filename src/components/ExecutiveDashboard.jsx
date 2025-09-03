@@ -147,13 +147,13 @@ function ExecutiveDashboard() {
 
   const eventTypeData = metrics?.eventTypes?.map(type => ({
     name: type.topic,
-    value: type.count,
+    value: Number(type.count),
     fill: `hsl(${Math.random() * 360}, 70%, 50%)`
   })) || []
 
   const cameraActivityData = metrics?.cameraActivity?.slice(0, 5).map(camera => ({
     name: camera.channel_name?.split(' - ')[1] || `Camera ${camera.channel_id}`,
-    events: camera.event_count
+    events: Number(camera.event_count)
   })) || []
 
   return (

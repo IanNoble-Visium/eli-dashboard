@@ -415,10 +415,14 @@ export function GeographicMap() {
               </div>
 
               {(() => {
-                console.log('🎨 Render decision:', { loading, error, eventsCount: events.length })
+                if (!import.meta.env.DEV) {
+                  // no-op in production
+                } else {
+                  // Minimal dev debug can be enabled if needed
+                  // console.log('Render decision', { loading, error, eventsCount: events.length })
+                }
 
                 if (loading) {
-                  console.log('🔄 Rendering loading state')
                   return (
                     <div className="h-96 bg-muted rounded-lg flex items-center justify-center">
                       <div className="flex items-center space-x-2">
@@ -443,7 +447,8 @@ export function GeographicMap() {
                   )
                 }
 
-                console.log('🗺️ Rendering map with events:', events.length)
+                // Dev-only: map render count
+                // console.log('Map with events', events.length)
                 return null
               })()}
 
