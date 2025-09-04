@@ -1,6 +1,6 @@
 # ELI Dashboard Deployment Guide
 
-## 🚀 Quick Deployment to Vercel (Monorepo: Frontend + Node API)
+## 🚀 Deployment to Vercel (Single app: Vite frontend + Node API functions)
 
 ### Step 1: GitHub Setup
 1. Push your repository to GitHub (monorepo root)
@@ -8,9 +8,9 @@
 ### Step 2: Vercel Project
 1. Import your GitHub repo in Vercel
 2. Ensure vercel.json at repo root includes:
-   - builds for `frontend/package.json` with `@vercel/static-build`
-   - builds for `api/**/*.js` with `@vercel/node`
-   - routes forwarding `/api/*` to serverless functions
+   - a static build using `npm run build` producing `dist/`
+   - rewrites so `/api/*` routes are handled by Node functions (via your hosting config)
+   - SPA fallback to `/index.html`
 3. Environment Variables (Project Settings → Environment Variables):
    - POSTGRES_URL (and/or DATABASE_URL)
    - NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE
@@ -19,18 +19,13 @@
 
 ### Step 3: Deploy
 1. Push to main (or click Redeploy)
-2. Verify build logs show frontend building under `/frontend` and output uploaded from `frontend/dist`
+2. Verify build logs show `npm run build` at the repo root and output uploaded from `dist/`
 3. Test endpoints: `/api/dashboard/health`, `/api/events`, `/api/snapshots`, `/api/events/geo`, `/api/dashboard/graph`
 
-## 🐳 Docker (optional for frontend only)
+## 🐳 Docker (optional)
 
-For local testing of the built frontend image:
-```bash
-# Build frontend image
-docker build -t eli-dashboard-frontend ./frontend
-# Run container
-docker run -d -p 3000:80 eli-dashboard-frontend
-```
+For local testing of a built static frontend image from `dist/` you can scaffold your own nginx container if needed.
+
 
 ## ⚙️ Environment Variables
 
@@ -82,8 +77,7 @@ VITE_API_BASE_URL=/api
 
 #### Frontend Build Errors
 ```bash
-# Clear cache and reinstall
-cd frontend
+# Clear cache and reinstall (root)
 rm -rf node_modules package-lock.json
 npm install
 npm run build

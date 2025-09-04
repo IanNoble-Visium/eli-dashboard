@@ -107,3 +107,7 @@ jspm_packages/
 # Local development
 .local
 
+.git/*
+frontend/node_modules/*
+node_modules/
+backup.bat

@@ -9,6 +9,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize,
+  Minimize2,
   Settings
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,6 +27,9 @@ const nodeConfig = {
   Event: { color: '#ef4444', size: 6, icon: '⚡' },
   Image: { color: '#22c55e', size: 4, icon: '🖼️' },
   Tag: { color: '#f59e0b', size: 3, icon: '🏷️' },
+  FaceIdentity: { color: '#8b5cf6', size: 5, icon: '🙂' },
+  PlateIdentity: { color: '#0ea5e9', size: 5, icon: '🚗' },
+  Watchlist: { color: '#10b981', size: 4, icon: '📋' },
   default: { color: '#6b7280', size: 5, icon: '⚪' }
 }
 
@@ -34,6 +38,9 @@ const edgeConfig = {
   GENERATED: { color: '#3b82f6', width: 2 },
   HAS_SNAPSHOT: { color: '#22c55e', width: 1.5 },
   TAGGED: { color: '#f59e0b', width: 1 },
+  MATCHED_FACE: { color: '#8b5cf6', width: 1.5 },
+  MATCHED_PLATE: { color: '#0ea5e9', width: 1.5 },
+  IN_LIST: { color: '#10b981', width: 1 },
   default: { color: '#6b7280', width: 1 }
 }
 
@@ -48,6 +55,7 @@ function SimpleTopology() {
   const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [fullPage, setFullPage] = useState(false)
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const graphRef = useRef()
   const imageCacheRef = useRef(new Map())
@@ -55,100 +63,40 @@ function SimpleTopology() {
   const colorForType = (type) => nodeConfig[type]?.color || nodeConfig.default.color
   const sizeForType = (type) => nodeConfig[type]?.size || nodeConfig.default.size
 
-  const buildGraph = (events = [], snapshots = [], cameras = []) => {
-    const nodesMap = new Map()
-    const links = []
-
-    // Cameras
-    cameras.forEach(c => {
-      const id = String(c.channel_id)
-      if (!nodesMap.has(`camera-${id}`)) {
-        nodesMap.set(`camera-${id}`, {
-          id: `camera-${id}`,
-          name: c.channel_name || `Camera ${id}`,
-          type: 'Camera',
-          color: colorForType('Camera'),
-          size: sizeForType('Camera'),
-          properties: {
-            id,
-            name: c.channel_name,
-            type: c.channel_type
-          }
-        })
-      }
-    })
-
-    // Events -> link to camera
-    events.forEach(e => {
-      const eventId = String(e.id)
-      const camId = e.channel_id != null ? String(e.channel_id) : ''
-      const eventNode = {
-        id: `event-${eventId}`,
-        name: `${e.topic || 'Event'} ${eventId}`,
-        type: 'Event',
-        color: colorForType('Event'),
-        size: sizeForType('Event'),
-        properties: {
-          topic: e.topic,
-          level: e.level,
-          channel_id: camId,
-          channel_name: e.channel_name,
-          timestamp: e.start_time
-        }
-      }
-      nodesMap.set(eventNode.id, eventNode)
-
-      if (camId && nodesMap.has(`camera-${camId}`)) {
-        links.push({ source: `camera-${camId}`, target: eventNode.id, type: 'GENERATED', color: edgeConfig.GENERATED.color, width: edgeConfig.GENERATED.width })
-      }
-    })
-
-    // Snapshots -> link to event
-    snapshots.forEach(s => {
-      const snapId = String(s.id)
-      const evId = String(s.event_id)
-      const imgNode = {
-        id: `image-${snapId}`,
-        name: `Snapshot ${snapId}`,
-        type: 'Image',
-        color: colorForType('Image'),
-        size: sizeForType('Image'),
-        properties: { type: s.type, path: s.path, image_url: s.image_url }
-      }
-      nodesMap.set(imgNode.id, imgNode)
-      if (evId) {
-        links.push({ source: `event-${evId}`, target: imgNode.id, type: 'HAS_SNAPSHOT', color: edgeConfig.HAS_SNAPSHOT.color, width: edgeConfig.HAS_SNAPSHOT.width })
-      }
-    })
-
-    return { nodes: Array.from(nodesMap.values()), links }
+  const buildGraphFromNeo = (data) => {
+    const nodes = (data.nodes || []).map(n => ({
+      id: n.id,
+      name: n.label,
+      type: n.type,
+      properties: n.properties,
+      color: colorForType(n.type),
+      size: sizeForType(n.type)
+    }))
+    const links = (data.edges || []).map(e => ({
+      source: e.source,
+      target: e.target,
+      type: e.type,
+      color: edgeConfig[e.type]?.color || edgeConfig.default.color,
+      width: edgeConfig[e.type]?.width || edgeConfig.default.width
+    }))
+    return { nodes, links }
   }
 
   const fetchGraphData = async () => {
     try {
       setLoading(true)
       setError(null)
-      const params = new URLSearchParams({ page: '1', limit: '200' })
-      const cameraParams = new URLSearchParams()
+      const params = new URLSearchParams({ limit: '300' })
       if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
         params.set('start', String(debouncedAbsoluteRange.start))
         params.set('end', String(debouncedAbsoluteRange.end))
-        cameraParams.set('start', String(debouncedAbsoluteRange.start))
-        cameraParams.set('end', String(debouncedAbsoluteRange.end))
       } else {
         params.set('timeRange', debouncedTimeRange)
-        cameraParams.set('timeRange', debouncedTimeRange)
       }
-      const [eventsRes, camsRes, snapsRes] = await Promise.all([
-        fetch(`${API_BASE}/events?${params.toString()}`),
-        fetch(`${API_BASE}/events/cameras?${cameraParams.toString()}`),
-        fetch(`${API_BASE}/snapshots?${params.toString()}`)
-      ])
-      if (!eventsRes.ok || !camsRes.ok || !snapsRes.ok) throw new Error('Failed to fetch graph data')
-      const eventsJson = await eventsRes.json()
-      const camsJson = await camsRes.json()
-      const snapsJson = await snapsRes.json()
-      const graph = buildGraph(eventsJson.events || [], snapsJson.snapshots || [], camsJson.cameras || [])
+      const res = await fetch(`${API_BASE}/dashboard/graph?${params.toString()}`)
+      if (!res.ok) throw new Error('Failed to fetch graph data')
+      const neoGraph = await res.json()
+      const graph = buildGraphFromNeo(neoGraph)
       setGraphData(graph)
       setIsLive(true)
     } catch (err) {
@@ -239,11 +187,17 @@ function SimpleTopology() {
           </Badge>
 
           <Badge variant={isLive ? "default" : "secondary"}>{isLive ? 'Live Data' : 'Demo Data'}</Badge>
+
+          <Button onClick={() => setFullPage(!fullPage)} variant="outline" size="sm">
+            {fullPage ? <Minimize2 className="w-4 h-4 mr-2" /> : <Maximize className="w-4 h-4 mr-2" />}
+            {fullPage ? 'Exit Full Page' : 'Full Page'}
+          </Button>
         </div>
       </div>
 
       {/* Controls */}
-      <Card>
+      {!fullPage && (
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <div>
@@ -297,11 +251,12 @@ function SimpleTopology() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Graph and Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className={`grid grid-cols-1 ${fullPage ? 'lg:grid-cols-1' : 'lg:grid-cols-4'} gap-6`}>
         {/* Graph Visualization */}
-        <div className="lg:col-span-3">
+        <div className={fullPage ? "lg:col-span-1" : "lg:col-span-3"}>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -334,6 +289,7 @@ function SimpleTopology() {
                   linkWidth="width"
                   linkDirectionalArrowLength={3}
                   linkDirectionalArrowRelPos={1}
+                  minMap={true}
                   onNodeClick={handleNodeClick}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     const label = node.name
@@ -382,7 +338,8 @@ function SimpleTopology() {
         </div>
 
         {/* Details Panel */}
-        <div>
+        {!fullPage && (
+          <div>
           {/* Selected Node Details */}
           <Card className="mb-6">
             <CardHeader>
@@ -468,6 +425,7 @@ function SimpleTopology() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </div>
   )

@@ -50,6 +50,7 @@ export function TopologyDashboard() {
   const [showLabels, setShowLabels] = useState(true)
   const [graphWidth, setGraphWidth] = useState(800)
   const [graphHeight, setGraphHeight] = useState(600)
+  const [fullPage, setFullPage] = useState(false)
   const graphRef = useRef()
 
   const fetchGraphData = async () => {
@@ -208,21 +209,27 @@ export function TopologyDashboard() {
             <Network className="w-3 h-3" />
             <span>{graphData.nodes.length} nodes</span>
           </Badge>
-          
+
           <Badge variant="outline" className="flex items-center space-x-1">
             <Activity className="w-3 h-3" />
             <span>{graphData.links.length} edges</span>
           </Badge>
-          
+
           <Button onClick={fetchGraphData} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
+          </Button>
+
+          <Button onClick={() => setFullPage(!fullPage)} variant="outline" size="sm">
+            {fullPage ? <Minimize2 className="w-4 h-4 mr-2" /> : <Maximize className="w-4 h-4 mr-2" />}
+            {fullPage ? 'Exit Full Page' : 'Full Page'}
           </Button>
         </div>
       </div>
 
       {/* Controls */}
-      <Card>
+      {!fullPage && (
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Settings className="w-5 h-5" />
@@ -294,11 +301,12 @@ export function TopologyDashboard() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Graph and Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className={`grid grid-cols-1 ${fullPage ? 'lg:grid-cols-1' : 'lg:grid-cols-4'} gap-6`}>
         {/* Graph Visualization */}
-        <div className="lg:col-span-3">
+        <div className={fullPage ? "lg:col-span-1" : "lg:col-span-3"}>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -332,6 +340,7 @@ export function TopologyDashboard() {
                   linkWidth="width"
                   linkDirectionalArrowLength={3}
                   linkDirectionalArrowRelPos={1}
+                  minMap={true}
                   onNodeClick={handleNodeClick}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     const label = node.name
@@ -359,7 +368,8 @@ export function TopologyDashboard() {
         </div>
 
         {/* Details Panel */}
-        <div>
+        {!fullPage && (
+          <div>
           {/* Selected Node Details */}
           <Card className="mb-6">
             <CardHeader>
@@ -445,6 +455,7 @@ export function TopologyDashboard() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </div>
   )

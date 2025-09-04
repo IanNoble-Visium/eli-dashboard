@@ -105,6 +105,7 @@ export function GeographicMap() {
 
 
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [fullPage, setFullPage] = useState(false)
   const mapRef = useRef()
   const firstLoadRef = useRef(true)
   const inFlightRef = useRef(false)
@@ -349,11 +350,17 @@ export function GeographicMap() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
+
+          <Button onClick={() => setFullPage(!fullPage)} variant="outline" size="sm">
+            {fullPage ? <Minimize2 className="w-4 h-4 mr-2" /> : <Maximize2 className="w-4 h-4 mr-2" />}
+            {fullPage ? 'Exit Full Page' : 'Full Page'}
+          </Button>
         </div>
       </div>
 
       {/* Filters */}
-      <Card>
+      {!fullPage && (
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Filter className="w-5 h-5" />
@@ -393,11 +400,12 @@ export function GeographicMap() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Map and Event Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 ${fullPage ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-6`}>
         {/* Map */}
-        <div className="lg:col-span-2">
+        <div className={fullPage ? "lg:col-span-1" : "lg:col-span-2"}>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -561,7 +569,8 @@ export function GeographicMap() {
         </div>
 
         {/* Event Details Panel */}
-        <div>
+        {!fullPage && (
+          <div>
           <Card>
             <CardHeader>
               <CardTitle>Event Details</CardTitle>
@@ -765,6 +774,7 @@ export function GeographicMap() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </div>
   )

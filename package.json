@@ -12,7 +12,10 @@
     "dev:all": "powershell -NoProfile -Command \"Start-Process -NoNewWindow -FilePath npm -ArgumentList 'run dev' ; Start-Sleep -Milliseconds 800 ; Start-Process -NoNewWindow -FilePath npm -ArgumentList 'run dev:api' ; Wait-Process -Name node,vite\"",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "setup:neo4j": "node --experimental-specifier-resolution=node scripts/setup-neo4j.js",
+    "migrate:neo4j": "node --experimental-specifier-resolution=node scripts/migrate-to-neo4j.js",
+    "reset:neo4j": "npm run setup:neo4j && npm run migrate:neo4j"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -87,3 +90,5 @@
     "vite": "^6.3.5"
   }
 }
+
+

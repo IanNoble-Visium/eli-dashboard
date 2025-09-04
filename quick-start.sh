@@ -15,27 +15,20 @@ echo "📋 Setting up environment..."
 echo "🔧 API runs via Vercel serverless functions. Ensure env vars are set in Vercel."
 
 # Frontend setup
-echo "🎨 Setting up frontend..."
-cd frontend
-
-# Copy environment variables if they don't exist
-if [ ! -f ".env" ]; then
-    cp .env.example .env
-    echo "📝 Created frontend .env file from example."
-fi
+echo "🎨 Setting up frontend (root)..."
 
 # Install Node dependencies
-echo "📦 Installing Node.js dependencies..."
-npm install
-
-cd ..
+if [ ! -d "node_modules" ]; then
+  echo "📦 Installing Node.js dependencies..."
+  npm install
+fi
 
 echo ""
 echo "✅ Setup complete!"
 echo ""
 echo "🚀 To start development:"
-echo "   Backend:  cd backend && python src/main.py"
-echo "   Frontend: cd frontend && npm run dev"
+echo "   API:      npm run dev:api"
+echo "   Frontend: npm run dev"
 echo ""
 echo "🌐 URLs:"
 echo "   Frontend: http://localhost:5173"

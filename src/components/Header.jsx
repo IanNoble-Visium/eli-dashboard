@@ -54,7 +54,13 @@ export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode }
           >
             <Menu className="w-5 h-5" />
           </Button>
-          
+
+          <img
+            src="/images/VisiumAnalytics-logo.png"
+            alt="Visium Analytics Logo"
+            className="h-8 w-auto mr-4"
+          />
+
           <div>
             <h2 className="text-xl font-semibold">ELI Demo Dashboard</h2>
             <p className="text-sm text-muted-foreground">

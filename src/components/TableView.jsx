@@ -246,7 +246,13 @@ function TableView() {
   const paginatedData = currentData.slice(startIndex, startIndex + itemsPerPage)
 
   const formatTimestamp = (timestamp) => {
-    return new Date(timestamp).toLocaleString()
+    if (timestamp == null) return '—'
+    // Handle epoch millis passed as string (e.g., "1756964907010") or number
+    const ts = typeof timestamp === 'string' && /^\d+$/.test(timestamp)
+      ? Number(timestamp)
+      : timestamp
+    const d = new Date(ts)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleString()
   }
 
   const formatFileSize = (bytes) => {

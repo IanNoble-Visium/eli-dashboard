@@ -12,6 +12,8 @@ import health from './dashboard/health.js'
 import metrics from './dashboard/metrics.js'
 import timeline from './dashboard/timeline.js'
 import graph from './dashboard/graph.js'
+import analytics from './dashboard/analytics.js'
+import identities from './dashboard/identities.js'
 
 // Events
 import eventsIndex from './events/index.js'
@@ -64,10 +66,12 @@ app.all('/api', apiIndex)
 app.all('/api/', apiIndex)
 
 // Dashboard routes
-app.all('/api/dashboard/health', health)
-app.all('/api/dashboard/metrics', metrics)
-app.all('/api/dashboard/timeline', timeline)
-app.all('/api/dashboard/graph', graph)
+app.get('/api/dashboard/health', health)
+app.get('/api/dashboard/metrics', metrics)
+app.get('/api/dashboard/timeline', timeline)
+app.get('/api/dashboard/graph', graph)
+app.get('/api/dashboard/analytics', analytics)
+app.get('/api/dashboard/identities', identities)
 
 // Events routes
 app.all('/api/events', eventsIndex)
@@ -94,4 +98,5 @@ const PORT = process.env.PORT || 5001
 app.listen(PORT, () => {
   console.log(`Local API server listening on http://localhost:${PORT}`)
 })
+
 

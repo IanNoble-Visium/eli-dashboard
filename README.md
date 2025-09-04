@@ -16,11 +16,10 @@ A comprehensive dashboard application for the ELI demo that visualizes and manag
    git clone <repository-url>
    cd eli-dashboard
    npm install
-   cd frontend && pnpm install
    ```
 
 2. **Configure environment variables**:
-   - Create `.env` in the root directory with your database credentials:
+   - Create `.env` in the root directory with your database and app settings:
      ```env
      POSTGRES_URL=postgresql://user:pass@host/db?sslmode=require
      NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
@@ -29,9 +28,6 @@ A comprehensive dashboard application for the ELI demo that visualizes and manag
      NEO4J_DATABASE=neo4j
      CORS_ORIGINS=http://localhost:5173
      PORT=5001
-     ```
-   - Create `frontend/.env.local`:
-     ```env
      VITE_API_BASE_URL=http://localhost:5001/api
      ```
 
@@ -41,7 +37,7 @@ A comprehensive dashboard application for the ELI demo that visualizes and manag
    npm run dev:api
 
    # Terminal 2: Start frontend (Vite)
-   cd frontend && pnpm dev
+   npm run dev
    ```
 
 4. **Access the application**:
@@ -83,8 +79,8 @@ A comprehensive dashboard application for the ELI demo that visualizes and manag
 
 ## 🌐 Deployment
 
-- Local development uses the Express server (npm run dev:api) and Vite (pnpm dev)
-- Production deployment uses Vercel serverless functions under /api and a static frontend
+- Local development uses the Express server (npm run dev:api) and Vite (npm run dev)
+- Production deployment uses Vercel serverless functions under /api and a static frontend built from the repo root
 - The same API handler code is shared across both environments
 
 ## 🔧 Configuration
@@ -124,21 +120,18 @@ PORT=5001
 
 ```
 eli-dashboard/
-├── frontend/                 # React Frontend Application (Vite)
-│   ├── src/
-│   │   ├── components/      # React components
-│   │   └── App.jsx          # Main application
-│   ├── package.json
-│   └── vite.config.js
+├── src/                      # React Frontend Application (Vite)
+│   ├── components/           # UI components
+│   └── App.jsx               # Main application
 ├── api/                      # Node.js API Handlers (serverless-compatible)
 │   ├── _lib/                 # Shared DB/CORS helpers (pg, neo4j)
 │   ├── dashboard/            # Dashboard endpoints (health, metrics, timeline, graph)
 │   ├── events/               # Events endpoints (index, geo, types, cameras, [id])
 │   ├── snapshots/            # Snapshots endpoints (index, types, [id])
 │   └── users/                # Users endpoints
-├── vercel.json               # Vercel monorepo config
-├── package.json              # API dependencies (pg, neo4j-driver)
-└── README.md                 # This file
+├── vercel.json               # Vercel config (static frontend + /api functions)
+├── package.json              # Root package (frontend + dev API scripts)
+└── README.md
 ```
 
 ## 🔗 API Endpoints
@@ -175,7 +168,7 @@ The dashboard connects to your existing ELI Demo system:
 ## 🛠️ Development
 
 ### Adding New Features
-1. Frontend components go in `frontend/src/components/`
+1. Frontend components go in `src/components/`
 2. API routes go in `api/` (serverless-compatible), shared helpers in `api/_lib`
 
 ### Styling
