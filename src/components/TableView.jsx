@@ -166,9 +166,12 @@ function TableView() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
+  const { authFetch, isAuthenticated } = useAuth()
 
   // Fetch data from API (with fallback to sample data)
   const fetchData = async (page = 1, limit = 10) => {
+    if (!isAuthenticated) return
+
     try {
       setLoading(true)
       setError(null)
@@ -181,10 +184,10 @@ function TableView() {
         params.set('timeRange', debouncedTimeRange)
       }
 
-      // Fetch real data from API
+      // Fetch real data from API using authenticated requests
       const [eventsResponse, snapshotsResponse] = await Promise.all([
-        fetch(`${API_BASE}/events?${params.toString()}`),
-        fetch(`${API_BASE}/snapshots?${params.toString()}`)
+        authFetch(`${API_BASE}/events?${params.toString()}`),
+        authFetch(`${API_BASE}/snapshots?${params.toString()}`)
       ])
 
       if (eventsResponse.ok) {
@@ -209,14 +212,14 @@ function TableView() {
   }
 
   useEffect(() => {
-    fetchData()
-  }, [debouncedTimeRange, debouncedAbsoluteRange])
+    if (isAuthenticated) fetchData()
+  }, [debouncedTimeRange, debouncedAbsoluteRange, isAuthenticated])
 
   useEffect(() => {
     const handleRefresh = () => fetchData()
     window.addEventListener('dashboard-refresh', handleRefresh)
     return () => window.removeEventListener('dashboard-refresh', handleRefresh)
-  }, [debouncedTimeRange, debouncedAbsoluteRange])
+  }, [debouncedTimeRange, debouncedAbsoluteRange, isAuthenticated])
 
   // Filter and search logic
   const filteredEvents = events.filter(event => {
