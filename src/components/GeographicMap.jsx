@@ -22,6 +22,7 @@ import FloatingWindow from '@/components/ui/floating-window'
 import { Badge } from '@/components/ui/badge'
 import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { useTimeRange } from '@/context/TimeRangeContext'
+import { useAuth } from '@/context/AuthContext'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LayersControl } from 'react-leaflet'
 import { Input } from '@/components/ui/input'
@@ -75,6 +76,7 @@ export function GeographicMap() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
+  const { authFetch, isAuthenticated } = useAuth()
   const [eventType, setEventType] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   // const [cameras, setCameras] = useState([]) // kept for future: used in Map statistics
@@ -123,6 +125,8 @@ export function GeographicMap() {
   }
 
   const fetchGeoEvents = useCallback(async () => {
+    if (!isAuthenticated) return
+
     try {
       // Build query string first to dedupe identical requests
       const params = new URLSearchParams({ limit: '1000' })
@@ -151,7 +155,7 @@ export function GeographicMap() {
       setLoading(true)
       setError(null)
 
-      const response = await fetch(url)
+      const response = await authFetch(url)
       if (import.meta.env.DEV) {
         console.log('📥 Response status:', response.status, response.statusText)
       }
@@ -195,7 +199,7 @@ export function GeographicMap() {
       setLoading(false)
       inFlightRef.current = false
     }
-  }, [debouncedAbsoluteRange, timeRange, eventType])
+  }, [debouncedAbsoluteRange, timeRange, eventType, isAuthenticated, authFetch])
 
   // const fetchCameras = async () => {
   //   try {
@@ -249,8 +253,14 @@ export function GeographicMap() {
     events.forEach(e => {
       if (typeof e.latitude === 'number' && typeof e.longitude === 'number') {
         const prev = latestByCam.get(e.channel_id)
-        const currTime = new Date(e.start_time || 0).getTime()
-        const prevTime = prev ? new Date(prev.start_time || 0).getTime() : -Infinity
+        const toMillis = (t) => {
+          if (t == null) return 0
+          const ts = typeof t === 'string' && /^\d+$/.test(t) ? Number(t) : t
+          const d = new Date(ts)
+          return isNaN(d.getTime()) ? 0 : d.getTime()
+        }
+        const currTime = toMillis(e.start_time)
+        const prevTime = prev ? toMillis(prev.start_time) : -Infinity
         if (!prev || currTime >= prevTime) {
 
 
@@ -273,7 +283,7 @@ export function GeographicMap() {
     try {
       setLoadingSnapshots(true)
       const params = new URLSearchParams({ page: '1', limit: '50', eventId: String(eventId) })
-      const res = await fetch(`${API_BASE}/snapshots?${params.toString()}`)
+      const res = await authFetch(`${API_BASE}/snapshots?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch snapshots')
       const data = await res.json()
       const snaps = (data.snapshots || []).filter(s => s.image_url)
@@ -289,7 +299,15 @@ export function GeographicMap() {
 
   const openImageViewerForEvent = async (event) => {
     const group = events.filter(e => e.channel_id === event.channel_id)
-      .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+      .sort((a, b) => {
+        const toMillis = (t) => {
+          if (t == null) return 0
+          const ts = typeof t === 'string' && /^\d+$/.test(t) ? Number(t) : t
+          const d = new Date(ts)
+          return isNaN(d.getTime()) ? 0 : d.getTime()
+        }
+        return toMillis(b.start_time) - toMillis(a.start_time)
+      })
     setEventGroup(group)
     const idx = group.findIndex(e => e.id === event.id)
     setCurrentEventIndex(Math.max(0, idx))
@@ -325,7 +343,12 @@ export function GeographicMap() {
   }
 
   const formatTimestamp = (timestamp) => {
-    return new Date(timestamp).toLocaleString()
+    if (timestamp == null) return '—'
+    const ts = typeof timestamp === 'string' && /^\d+$/.test(timestamp)
+      ? Number(timestamp)
+      : timestamp
+    const d = new Date(ts)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleString()
   }
 
 
@@ -613,11 +636,12 @@ export function GeographicMap() {
           open={imageViewerOpen}
           onOpenChange={setImageViewerOpen}
           title={selectedEvent ? `${selectedEvent.topic} • ${selectedEvent.channel_name}` : 'Event'}
-          initialRect={{ x: 260, y: 80, w: 900, h: 620 }}
+          initialRect={{ x: 240, y: 80, w: 820, h: 560 }}
         >
+          <div className="flex flex-col h-full overflow-hidden">
           {/* Event navigation when multiple events at location */}
           {eventGroup.length > 1 && (
-            <div className="flex items-center justify-between mb-3 text-sm">
+            <div className="flex items-center justify-between mb-3 text-sm shrink-0">
               <Button size="sm" variant="outline" onClick={goToPrevEvent} disabled={currentEventIndex === 0}>
                 Previous event
               </Button>
@@ -631,7 +655,8 @@ export function GeographicMap() {
           )}
 
           {/* Carousel + thumbnail strip */}
-          <div className="relative">
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="relative flex-1 min-h-0">
             {loadingSnapshots && (
               <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10 rounded-md">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
@@ -642,7 +667,7 @@ export function GeographicMap() {
               const snaps = snapshotsCache[selectedEvent.id] || []
               if (snaps.length === 0) {
                 return (
-                  <div className="flex items-center justify-center bg-black/80 rounded-md h-[60vh] text-white/80">
+                  <div className="flex items-center justify-center bg-black/80 rounded-md text-white/80" style={{ height: 'calc(100% - 110px)' }}>
                     No snapshots available for this event.
                   </div>
                 )
@@ -653,7 +678,7 @@ export function GeographicMap() {
                     <CarouselContent>
                       {snaps.map((snap, idx) => (
                         <CarouselItem key={snap.id}>
-                          <div className="flex items-center justify-center bg-black/80 rounded-md overflow-hidden h-[55vh]">
+                          <div className="flex items-center justify-center bg-black/80 rounded-md overflow-hidden" style={{ height: 'calc(100% - 110px)' }}>
                             <img
                               src={snap.image_url}
                               alt={`${selectedEvent.topic} snapshot`}
@@ -688,6 +713,8 @@ export function GeographicMap() {
               )
             })()}
 
+            </div>
+
 
             {/* Metadata */}
             {selectedEvent && (
@@ -707,12 +734,9 @@ export function GeographicMap() {
               </div>
             )}
           </div>
+        </div>
         </FloatingWindow>
       )}
-
-                  <span>Motion Detected</span>
-                </div>
-                <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 rounded-full" style={{backgroundColor: '#3b82f6'}} />
                   <span>Camera</span>
                 </div>

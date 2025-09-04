@@ -1,7 +1,8 @@
 import { withCors } from '../_lib/cors.js'
+import { withAuth } from '../_lib/auth.js'
 import { query, toMillisAgo } from '../_lib/db.js'
 
-export default withCors(async function handler(req, res) {
+export default withCors(withAuth(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })
   try {
     const eventType = req.query.eventType
@@ -66,5 +67,5 @@ export default withCors(async function handler(req, res) {
     console.error('timeline error', e)
     res.status(500).json({ error: 'Failed to fetch timeline data' })
   }
-})
+}))
 

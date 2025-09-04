@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { useTimeRange } from '@/context/TimeRangeContext'
+import { useAuth } from '@/context/AuthContext'
 import {
   Dialog,
   DialogContent,

@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react'
-import { 
-  Menu, 
-  Moon, 
-  Sun, 
-  Bell, 
-  Settings, 
+import {
+  Menu,
+  ChevronRight,
+  Moon,
+  Sun,
+  Bell,
+  Settings,
   RefreshCw,
   Wifi,
-  WifiOff
+  WifiOff,
+  LogOut
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode }) {
+export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode, onLogout }) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [lastUpdate, setLastUpdate] = useState(new Date())
@@ -51,8 +53,13 @@ export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode }
             size="sm"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="lg:hidden"
+            title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
-            <Menu className="w-5 h-5" />
+            {sidebarOpen ? (
+              <Menu className="w-5 h-5" />
+            ) : (
+              <ChevronRight className="w-5 h-5" />
+            )}
           </Button>
 
           <img
@@ -122,6 +129,16 @@ export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode }
             ) : (
               <Moon className="w-5 h-5" />
             )}
+          </Button>
+
+          {/* Logout */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onLogout}
+            title="Logout"
+          >
+            <LogOut className="w-5 h-5" />
           </Button>
 
           {/* Settings */}

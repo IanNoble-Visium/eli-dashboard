@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { 
-  BarChart3, 
-  Map, 
-  Network, 
-  Table, 
-  Search, 
+import {
+  BarChart3,
+  Map,
+  Network,
+  Table,
+  Search,
   ChevronLeft,
+  ChevronRight,
   Activity,
   Eye,
   Database
@@ -59,11 +60,13 @@ export function Sidebar({ open, setOpen }) {
           <button
             onClick={() => setOpen(!open)}
             className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg hover:bg-accent transition-colors"
+            title={open ? "Minimize sidebar" : "Maximize sidebar"}
           >
-            <ChevronLeft className={cn(
-              "w-4 h-4 transition-transform duration-300",
-              !open && "rotate-180"
-            )} />
+            {open ? (
+              <ChevronLeft className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
           </button>
         </div>
 

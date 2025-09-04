@@ -1,11 +1,24 @@
-import express from 'express'
+// Load environment variables from repository root .env FIRST
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 import dotenv from 'dotenv'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const envPath = join(__dirname, '..', '.env')
+console.log('Attempting to load .env from:', envPath)
+const result = dotenv.config({ path: envPath })
+console.log('dotenv result:', result)
+console.log('process.env after dotenv:', Object.keys(process.env).filter(key => key.includes('APP') || key.includes('JWT')))
+
+import express from 'express'
+
 // Load environment variables from repository root .env
-dotenv.config()
+dotenv.config({ path: '../.env' })
 
 // Import serverless handlers (default exports: (req, res) => ...)
 import apiIndex from './index.js'
+import login from './login.js'
 
 // Dashboard
 import health from './dashboard/health.js'
@@ -65,13 +78,16 @@ function withParamToQuery(paramName, handler) {
 app.all('/api', apiIndex)
 app.all('/api/', apiIndex)
 
+// Login route
+app.all('/api/login', login)
+
 // Dashboard routes
-app.get('/api/dashboard/health', health)
-app.get('/api/dashboard/metrics', metrics)
-app.get('/api/dashboard/timeline', timeline)
-app.get('/api/dashboard/graph', graph)
-app.get('/api/dashboard/analytics', analytics)
-app.get('/api/dashboard/identities', identities)
+app.all('/api/dashboard/health', health)
+app.all('/api/dashboard/metrics', metrics)
+app.all('/api/dashboard/timeline', timeline)
+app.all('/api/dashboard/graph', graph)
+app.all('/api/dashboard/analytics', analytics)
+app.all('/api/dashboard/identities', identities)
 
 // Events routes
 app.all('/api/events', eventsIndex)

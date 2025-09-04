@@ -5,11 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { RefreshCw } from 'lucide-react'
 import { useTimeRange } from '@/context/TimeRangeContext'
+import { useAuth } from '@/context/AuthContext'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 
 export default function WatchlistBreakdownCard() {
   const { debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
+  const { authFetch, isAuthenticated } = useAuth()
   const [data, setData] = useState({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -26,7 +28,7 @@ export default function WatchlistBreakdownCard() {
       } else {
         params.set('timeRange', debouncedTimeRange)
       }
-      const res = await fetch(`${API_BASE}/dashboard/graph?${params.toString()}`)
+      const res = await authFetch(`${API_BASE}/dashboard/graph?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch watchlist data')
       const json = await res.json()
       setData({ nodes: json.nodes || [], edges: json.edges || [] })
@@ -37,7 +39,9 @@ export default function WatchlistBreakdownCard() {
     }
   }
 
-  useEffect(() => { fetchGraph() }, [debouncedTimeRange, debouncedAbsoluteRange])
+  useEffect(() => {
+    if (isAuthenticated) fetchGraph()
+  }, [debouncedTimeRange, debouncedAbsoluteRange, isAuthenticated])
 
   const summary = useMemo(() => {
     const watchlists = new Map() // id -> { name, level, events, face_hits, plate_hits }

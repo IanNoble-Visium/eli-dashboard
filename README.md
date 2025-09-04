@@ -193,6 +193,8 @@ The dashboard connects to your existing ELI Demo system:
 3. **CORS issues**: Update CORS_ORIGINS in Vercel
 4. **Build failures**: Check Node.js version
 
+5. **API returns HTML instead of JSON (Vercel)**: Ensure required environment variables are set in Project Settings → Environment Variables: `POSTGRES_URL`, `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`. Missing values can cause handlers to return framework HTML instead of JSON.
+
 ### Performance Optimization
 - Frontend: Automatic gzip/CDN on Vercel
 - API: Optimize queries; pg pool already enabled; consider caching if needed
@@ -210,6 +212,24 @@ The dashboard connects to your existing ELI Demo system:
 ✅ **Production Ready** - Scalable architecture with proper error handling
 
 ## 🔧 Recent Updates & Fixes
+
+### September 4, 2025 - Map Viewer and Date/Time UX
+
+#### ✅ Geographic Map Image Viewer
+- Fixed JSX structure by wrapping viewer internals in a single container to resolve the “Adjacent JSX elements must be wrapped” error
+- Stabilized layout so the thumbnail strip remains visible while resizing
+- Tuned default window size for better usability: initialRect ≈ `{ x: 240, y: 80, w: 820, h: 560 }`
+- Main viewer area uses a flexible layout; image region height set to `calc(100% - 110px)` to prevent clipping
+
+#### ✅ Robust Date/Time Formatting
+- Hardened timestamp formatting across Geographic Map popups and Event Details to avoid “Invalid Date”
+- Applied the same safe formatter to SimpleMap popups
+- When a timestamp is missing or invalid, the UI now shows an em dash (—)
+
+#### 🧪 How to Verify
+- Open Geographic Map, click a marker to open the image viewer; resize the window — thumbnails should remain visible
+- Inspect map popups and Event Details — dates should render cleanly with no “Invalid Date” messages
+
 
 ### September 2, 2025 - Major Stability & UI Improvements
 
@@ -256,8 +276,8 @@ The dashboard connects to your existing ELI Demo system:
 ---
 
 **Project Status**: ✅ **Production Ready & Fully Functional**
-**Version**: 1.1
-**Last Updated**: September 2, 2025
+**Version**: 1.1.1
+**Last Updated**: September 4, 2025
 **Deployment**: Vercel (Auto-deploy from main branch)
 
 Built for **Visium Technologies** - **TruContext Intelligence Platform**

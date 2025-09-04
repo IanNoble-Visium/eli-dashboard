@@ -7,11 +7,14 @@ import GeographicMap from '@/components/GeographicMap'
 import SimpleTopology from '@/components/SimpleTopology'
 import TableView from '@/components/TableView'
 import SearchView from '@/components/SearchView'
+import Login from '@/components/Login'
+import { useAuth } from '@/context/AuthContext'
 import './App.css'
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
+  const { isAuthenticated, loading, logout } = useAuth()
 
   useEffect(() => {
     // Check for saved theme preference or default to light mode
@@ -33,19 +36,28 @@ function App() {
     }
   }
 
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+
+  if (!isAuthenticated) {
+    return <Login />
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-background text-foreground">
         <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-        
+
         <div className={`transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'}`}>
-          <Header 
+          <Header
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             darkMode={darkMode}
             toggleDarkMode={toggleDarkMode}
+            onLogout={logout}
           />
-          
+
           <main className="p-6">
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

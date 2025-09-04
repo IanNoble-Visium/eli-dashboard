@@ -96,7 +96,7 @@ export function SimpleMap() {
                     <div className="p-2">
                       <h3 className="font-semibold">{event.topic}</h3>
                       <p className="text-sm">{event.channel_name}</p>
-                      <p className="text-sm">{new Date(event.start_time).toLocaleString()}</p>
+                      <p className="text-sm">{(() => { const t=event.start_time; if(t==null) return '—'; const ts=typeof t==='string' && /^\d+$/.test(t)? Number(t): t; const d=new Date(ts); return isNaN(d.getTime()) ? '—' : d.toLocaleString(); })()}</p>
                     </div>
                   </Popup>
                 </Marker>

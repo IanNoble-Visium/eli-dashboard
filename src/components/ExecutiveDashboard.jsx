@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { useTimeRange } from '@/context/TimeRangeContext'
+import { useAuth } from '@/context/AuthContext'
 import {
   LineChart,
   Line,
@@ -45,6 +46,7 @@ function ExecutiveDashboard() {
   const [metrics, setMetrics] = useState(null)
   const [timeline, setTimeline] = useState([])
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
+  const { authFetch, isAuthenticated } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -62,13 +64,13 @@ function ExecutiveDashboard() {
       }
 
       // Fetch metrics
-      const metricsResponse = await fetch(`${API_BASE}/dashboard/metrics?${baseParams.toString()}`)
+      const metricsResponse = await authFetch(`${API_BASE}/dashboard/metrics?${baseParams.toString()}`)
       if (!metricsResponse.ok) throw new Error('Failed to fetch metrics')
       const metricsData = await metricsResponse.json()
       setMetrics(metricsData)
 
       // Fetch timeline data
-      const timelineResponse = await fetch(`${API_BASE}/dashboard/timeline?${baseParams.toString()}`)
+      const timelineResponse = await authFetch(`${API_BASE}/dashboard/timeline?${baseParams.toString()}`)
       if (!timelineResponse.ok) throw new Error('Failed to fetch timeline')
       const timelineData = await timelineResponse.json()
       setTimeline(timelineData.data || [])
@@ -82,6 +84,8 @@ function ExecutiveDashboard() {
   }
 
   useEffect(() => {
+    if (!isAuthenticated) return
+
     fetchDashboardData()
 
     const interval = setInterval(fetchDashboardData, 300000)
@@ -91,7 +95,7 @@ function ExecutiveDashboard() {
       clearInterval(interval)
       window.removeEventListener('dashboard-refresh', handleDashboardRefresh)
     }
-  }, [debouncedTimeRange, debouncedAbsoluteRange])
+  }, [debouncedTimeRange, debouncedAbsoluteRange, isAuthenticated])
 
 
   if (error) {

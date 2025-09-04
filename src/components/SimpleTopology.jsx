@@ -19,6 +19,7 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { useTimeRange } from '@/context/TimeRangeContext'
+import { useAuth } from '@/context/AuthContext'
 
 
 // Node type colors and sizes
@@ -57,6 +58,7 @@ function SimpleTopology() {
   const [error, setError] = useState(null)
   const [fullPage, setFullPage] = useState(false)
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
+  const { authFetch, isAuthenticated } = useAuth()
   const graphRef = useRef()
   const imageCacheRef = useRef(new Map())
 
@@ -93,7 +95,7 @@ function SimpleTopology() {
       } else {
         params.set('timeRange', debouncedTimeRange)
       }
-      const res = await fetch(`${API_BASE}/dashboard/graph?${params.toString()}`)
+      const res = await authFetch(`${API_BASE}/dashboard/graph?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch graph data')
       const neoGraph = await res.json()
       const graph = buildGraphFromNeo(neoGraph)
@@ -109,11 +111,21 @@ function SimpleTopology() {
   }
 
   useEffect(() => {
+    if (!isAuthenticated) return
+
     fetchGraphData()
     const onRefresh = () => fetchGraphData()
     window.addEventListener('dashboard-refresh', onRefresh)
     return () => window.removeEventListener('dashboard-refresh', onRefresh)
-  }, [debouncedTimeRange, debouncedAbsoluteRange])
+  }, [debouncedTimeRange, debouncedAbsoluteRange, isAuthenticated])
+
+  // Refresh canvas when toggling image display so visuals update immediately
+  useEffect(() => {
+    if (graphRef.current) {
+      try { graphRef.current.refresh() } catch (_) {}
+    }
+  }, [showImages])
+
 
 
   const handleNodeClick = (node) => {
@@ -291,20 +303,22 @@ function SimpleTopology() {
                   linkDirectionalArrowRelPos={1}
                   minMap={true}
                   onNodeClick={handleNodeClick}
-                  nodeCanvasObject={(node, ctx, globalScale) => {
-                    const label = node.name
-                    const fontSize = 12 / globalScale
-                    ctx.font = `${fontSize}px Sans-Serif`
-
-                    // Draw node
-                    ctx.fillStyle = node.color
+                  // Replace default node drawing so we control circles vs images
+                  nodeCanvasObjectMode={() => 'replace'}
+                  // Ensure pointer interactions match the visual (circular area)
+                  nodePointerAreaPaint={(node, color, ctx) => {
+                    ctx.fillStyle = color
                     ctx.beginPath()
                     ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI, false)
                     ctx.fill()
+                  }}
+                  nodeCanvasObject={(node, ctx, globalScale) => {
+                    const radius = node.size
+                    const isImageNode = node.type === 'Image'
+                    const url = isImageNode ? (node.properties?.image_url || node.properties?.url || node.properties?.path) : null
+                    const shouldDrawImage = Boolean(showImages && isImageNode && url)
 
-                    // Optionally draw thumbnail images for snapshot nodes
-                    if (showImages && node.type === 'Image' && node.properties?.image_url) {
-                      const url = node.properties.image_url
+                    if (shouldDrawImage) {
                       let img = imageCacheRef.current.get(url)
 
                       if (!img) {
@@ -323,13 +337,40 @@ function SimpleTopology() {
                         imageCacheRef.current.set(url, img)
                       }
 
-                      if (img && img !== 'error' && img.complete) {
-                        const size = Math.max(10, node.size * 2)
+                      if (img && img !== 'error' && img.complete && img.naturalWidth > 0) {
+                        const size = Math.max(12, radius * 2)
                         try {
+                          // Draw as a circular clipped image
+                          ctx.save()
+                          ctx.beginPath()
+                          ctx.arc(node.x, node.y, size / 2, 0, 2 * Math.PI, false)
+                          ctx.closePath()
+                          ctx.clip()
                           ctx.drawImage(img, node.x - size / 2, node.y - size / 2, size, size)
+                          ctx.restore()
+                          // Optional subtle ring
+                          ctx.strokeStyle = '#ffffff'
+                          ctx.lineWidth = 1
+                          ctx.beginPath()
+                          ctx.arc(node.x, node.y, size / 2, 0, 2 * Math.PI)
+                          ctx.stroke()
                         } catch (_) {}
+                        return
                       }
+
+                      // Placeholder while image loads or on error
+                      ctx.fillStyle = '#e5e7eb'
+                      ctx.beginPath()
+                      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false)
+                      ctx.fill()
+                      return
                     }
+
+                    // Default: draw colored circle
+                    ctx.fillStyle = node.color
+                    ctx.beginPath()
+                    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false)
+                    ctx.fill()
                   }}
                 />
               </div>

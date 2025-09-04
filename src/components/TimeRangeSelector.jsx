@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { useTimeRange } from '@/context/TimeRangeContext'
+import { useAuth } from '@/context/AuthContext'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 
@@ -36,6 +37,7 @@ const Histogram = React.memo(function Histogram({ bins }) {
 
 export default function TimeRangeSelector({ className }) {
   const { timeRange, setTimeRange, setAbsoluteRange, clearAbsoluteRange } = useTimeRange()
+  const { authFetch, isAuthenticated } = useAuth()
   const [bins, setBins] = useState([])
   const [rangePct, setRangePct] = useState([0, 100])
 
@@ -43,13 +45,15 @@ export default function TimeRangeSelector({ className }) {
 
   // Fetch timeline histogram for the chosen preset. This is lightweight and cached by browser.
   useEffect(() => {
+    if (!isAuthenticated) return
+
     const ctrl = new AbortController()
-    fetch(`${API_BASE}/dashboard/timeline?timeRange=${encodeURIComponent(timeRange)}`, { signal: ctrl.signal })
+    authFetch(`${API_BASE}/dashboard/timeline?timeRange=${encodeURIComponent(timeRange)}`, { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : Promise.reject(new Error('timeline fetch failed')))
       .then(data => setBins((data.data || []).map(d => ({ t: new Date(d.time_bucket).getTime(), v: Number(d.event_count) || 0 }))))
       .catch(() => {})
     return () => ctrl.abort()
-  }, [timeRange])
+  }, [timeRange, isAuthenticated, authFetch])
 
   // Reset absolute range when preset changes or user selects full range
   useEffect(() => {
