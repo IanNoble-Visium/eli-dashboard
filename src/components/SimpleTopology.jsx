@@ -12,13 +12,24 @@ import {
   Minimize2,
   Settings,
   EyeOff,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { useTimeRange } from '@/context/TimeRangeContext'
 import { useAuth } from '@/context/AuthContext'
@@ -62,9 +73,102 @@ function SimpleTopology() {
   const [fullPage, setFullPage] = useState(false)
   const [visibleNodeTypes, setVisibleNodeTypes] = useState(Object.keys(nodeConfig).filter(key => key !== 'default'))
   const [enableEdgeClick, setEnableEdgeClick] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  const [showMiniMapDialog, setShowMiniMapDialog] = useState(false)
+  const [miniMapZoom, setMiniMapZoom] = useState(1)
+  const [miniMapOpacity, setMiniMapOpacity] = useState(0.8)
+  const [miniMapSize, setMiniMapSize] = useState(300)
+  const [showOffScreenNotification, setShowOffScreenNotification] = useState(false)
+  const [offScreenNodes, setOffScreenNodes] = useState([])
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const { authFetch, isAuthenticated } = useAuth()
   const graphRef = useRef()
+  const miniMapRef = useRef()
+  // Layout state
+  const [layoutMode, setLayoutMode] = useState('force') // 'force' | 'hierarchical' | 'grid' | 'radial' | 'circular'
+  const [layoutOptions, setLayoutOptions] = useState({
+    gridSpacing: 120,
+    radialRingSpacing: 180,
+    circularRadius: 240,
+    hierarchicalDistance: 150,
+  })
+
+  // Memoized slider value arrays to avoid ref churn in Radix Slider
+  const gridValueArr = useMemo(() => [layoutOptions.gridSpacing], [layoutOptions.gridSpacing])
+  const radialValueArr = useMemo(() => [layoutOptions.radialRingSpacing], [layoutOptions.radialRingSpacing])
+  const circularValueArr = useMemo(() => [layoutOptions.circularRadius], [layoutOptions.circularRadius])
+  const hierValueArr = useMemo(() => [layoutOptions.hierarchicalDistance], [layoutOptions.hierarchicalDistance])
+
+  // Apply layout by fixing node positions (fx, fy) for non-force layouts
+  const applyLayout = useCallback(() => {
+    const g = graphData
+    if (!g || !g.nodes) return
+
+    // Clear any existing fixed positions first
+    g.nodes.forEach(n => { delete n.fx; delete n.fy })
+
+    const N = g.nodes.length
+    if (N === 0) return
+
+    const spacing = layoutOptions.gridSpacing
+    const ringSpacing = layoutOptions.radialRingSpacing
+    const circR = layoutOptions.circularRadius
+
+    if (layoutMode === 'grid') {
+      const cols = Math.ceil(Math.sqrt(N))
+      const rows = Math.ceil(N / cols)
+      const xOffset = (cols - 1) / 2
+      const yOffset = (rows - 1) / 2
+      g.nodes.forEach((n, i) => {
+        const row = Math.floor(i / cols)
+        const col = i % cols
+        n.fx = (col - xOffset) * spacing
+        n.fy = (row - yOffset) * spacing
+      })
+    } else if (layoutMode === 'circular') {
+      const R = Math.max(120, circR)
+      g.nodes.forEach((n, i) => {
+        const angle = (2 * Math.PI * i) / N
+        n.fx = Math.cos(angle) * R
+        n.fy = Math.sin(angle) * R
+      })
+    } else if (layoutMode === 'radial') {
+      // Group by type into concentric rings for quick readability
+      const groups = new Map()
+      g.nodes.forEach(n => {
+        if (!groups.has(n.type)) groups.set(n.type, [])
+        groups.get(n.type).push(n)
+      })
+      const types = Array.from(groups.keys())
+      types.forEach((t, ringIdx) => {
+        const radius = (ringIdx + 1) * ringSpacing
+        const arr = groups.get(t)
+        arr.forEach((n, i) => {
+          const angle = (2 * Math.PI * i) / arr.length
+          n.fx = Math.cos(angle) * radius
+          n.fy = Math.sin(angle) * radius
+        })
+      })
+    }
+
+    // Reheat simulation to animate transition and let force-graph redraw
+    try { graphRef.current?.d3ReheatSimulation?.() } catch (_) {}
+  }, [layoutMode, layoutOptions.gridSpacing, layoutOptions.radialRingSpacing, layoutOptions.circularRadius, graphData.nodes.length])
+
+  // Re-apply layout on changes
+  useEffect(() => {
+    if (layoutMode === 'force' || layoutMode === 'hierarchical') {
+      // Ensure free movement for force/dag layouts
+      if (graphData?.nodes) {
+        graphData.nodes.forEach(n => { delete n.fx; delete n.fy })
+        try { graphRef.current?.d3ReheatSimulation?.() } catch(_) {}
+      }
+      return
+    }
+    applyLayout()
+  }, [layoutMode, layoutOptions, graphData.nodes.length])
+
   const imageCacheRef = useRef(new Map())
   // Smooth visibility animation state
   const fadeAnimatingRef = useRef(false)
@@ -75,7 +179,14 @@ function SimpleTopology() {
     fadeAnimatingRef.current = true
     const loop = () => {
       if (!graphRef.current) { fadeAnimatingRef.current = false; return }
-      graphRef.current.refresh()
+      // Use d3ReheatSimulation to trigger a refresh instead of refresh()
+      try {
+        if (graphRef.current.d3ReheatSimulation) {
+          graphRef.current.d3ReheatSimulation()
+        }
+      } catch (e) {
+        // Silently handle any errors
+      }
       if (Date.now() < fadeEndRef.current) {
         requestAnimationFrame(loop)
       } else {
@@ -145,7 +256,11 @@ function SimpleTopology() {
   // Refresh canvas when toggling image display so visuals update immediately
   useEffect(() => {
     if (graphRef.current) {
-      try { graphRef.current.refresh() } catch (_) {}
+      try {
+        if (graphRef.current.d3ReheatSimulation) {
+          graphRef.current.d3ReheatSimulation()
+        }
+      } catch (_) {}
     }
   }, [showImages])
 
@@ -164,6 +279,76 @@ function SimpleTopology() {
     prevVisibleRef.current = visibleNodeTypes
     startFadeAnimation(300)
   }, [visibleNodeTypes, startFadeAnimation])
+
+  // Debounce search term for performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Detect off-screen nodes when mini-map is open
+  useEffect(() => {
+    if (!showMiniMapDialog || !graphRef.current) return
+
+    const checkOffScreenNodes = () => {
+      try {
+        const canvas = graphRef.current.canvas
+        if (!canvas) return
+
+        const rect = canvas.getBoundingClientRect()
+        const offScreen = graphData.nodes.filter(node => {
+          if (!isNodeVisible(node)) return false
+          const screenX = node.x
+          const screenY = node.y
+          return screenX < 0 || screenX > rect.width || screenY < 0 || screenY > rect.height
+        })
+
+        setOffScreenNodes(offScreen)
+        setShowOffScreenNotification(offScreen.length > 0)
+      } catch (e) {
+        // Silently handle errors
+      }
+    }
+
+    const interval = setInterval(checkOffScreenNodes, 2000)
+    checkOffScreenNodes() // Initial check
+
+    return () => clearInterval(interval)
+  }, [showMiniMapDialog, graphData.nodes, visibleNodeTypes])
+
+  // Keyboard shortcuts for mini-map
+  useEffect(() => {
+    if (!showMiniMapDialog) return
+
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case 'm':
+            e.preventDefault()
+            setShowMiniMapDialog(false)
+            break
+          case '+':
+          case '=':
+            e.preventDefault()
+            setMiniMapZoom(prev => Math.min(3, prev + 0.1))
+            break
+          case '-':
+            e.preventDefault()
+            setMiniMapZoom(prev => Math.max(0.1, prev - 0.1))
+            break
+          case '0':
+            e.preventDefault()
+            setMiniMapZoom(1)
+            break
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showMiniMapDialog])
 
 
 
@@ -201,13 +386,29 @@ function SimpleTopology() {
       graphRef.current.zoomToFit(400)
     }
   }
+  const handleResetLayout = () => {
+    try {
+      if (layoutMode === 'force' || layoutMode === 'hierarchical') {
+        graphRef.current?.d3ReheatSimulation?.()
+      } else {
+        applyLayout()
+      }
+      graphRef.current?.zoomToFit?.(400)
+    } catch (_) {}
+  }
+
 
 
 
   // Visibility helpers: keep full simulation data, only hide visually
   const filteredNodes = useMemo(() =>
-    graphData.nodes.filter(node => visibleNodeTypes.includes(node.type)),
-    [graphData.nodes, visibleNodeTypes]
+    graphData.nodes.filter(node =>
+      visibleNodeTypes.includes(node.type) &&
+      (debouncedSearchTerm === '' ||
+       node.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+       node.type.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
+    ),
+    [graphData.nodes, visibleNodeTypes, debouncedSearchTerm]
   )
 
   const nodeIds = useMemo(() =>
@@ -287,40 +488,101 @@ function SimpleTopology() {
         </div>
       </div>
 
+      {/* Time Range Controls */}
+      {!fullPage && (
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="py-3">
+            <TimeRangeSelector />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Controls */}
       {!fullPage && (
         <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <div>
-              <TimeRangeSelector />
-            </div>
-
             <Settings className="w-5 h-5" />
             <span>Graph Controls</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Display Options</label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={showImages}
-                    onCheckedChange={setShowImages}
-                  />
-                  <span className="text-sm">Show Images</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={enableEdgeClick}
-                    onCheckedChange={setEnableEdgeClick}
-                  />
-                  <span className="text-sm">Enable Edge Click</span>
-                </div>
-              </div>
-            </div>
+           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+             <div>
+               <label className="text-sm font-medium mb-2 block">Search Nodes</label>
+               <Input
+                 placeholder="Search nodes..."
+                 value={searchTerm}
+                 onChange={(e) => setSearchTerm(e.target.value)}
+                 className="w-full"
+               />
+             </div>
+
+             <div>
+               <label className="text-sm font-medium mb-2 block">Display Options</label>
+               <div className="space-y-2">
+                 <div className="flex items-center space-x-2">
+                   <Switch
+                     checked={showImages}
+                     onCheckedChange={setShowImages}
+                   />
+                   <span className="text-sm">Show Images</span>
+                 </div>
+                 <div className="flex items-center space-x-2">
+                   <Switch
+                     checked={enableEdgeClick}
+                     onCheckedChange={setEnableEdgeClick}
+                   />
+                   <span className="text-sm">Enable Edge Click</span>
+                 </div>
+               </div>
+             </div>
+
+             {/* Layout Selector */}
+             <div>
+               <label className="text-sm font-medium mb-2 block">Layout</label>
+               <div className="space-y-2">
+                 <Select value={layoutMode} onValueChange={(v) => setLayoutMode(v)}>
+                   <SelectTrigger className="w-full"><SelectValue placeholder="Select layout" /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="force">Force-directed</SelectItem>
+                     <SelectItem value="hierarchical">Hierarchical (Top→Down)</SelectItem>
+                     <SelectItem value="grid">Grid</SelectItem>
+                     <SelectItem value="radial">Radial</SelectItem>
+                     <SelectItem value="circular">Circular</SelectItem>
+                   </SelectContent>
+                 </Select>
+
+                 {layoutMode === 'grid' && (
+                   <div className="flex items-center space-x-2">
+                     <span className="text-xs w-24">Grid spacing</span>
+                     <Slider value={gridValueArr} min={60} max={240} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, gridSpacing: v[0]}))} className="flex-1" />
+                     <span className="text-xs w-10 text-right">{layoutOptions.gridSpacing}</span>
+                   </div>
+                 )}
+                 {layoutMode === 'radial' && (
+                   <div className="flex items-center space-x-2">
+                     <span className="text-xs w-24">Ring spacing</span>
+                     <Slider value={radialValueArr} min={80} max={300} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, radialRingSpacing: v[0]}))} className="flex-1" />
+                     <span className="text-xs w-10 text-right">{layoutOptions.radialRingSpacing}</span>
+                   </div>
+                 )}
+                 {layoutMode === 'circular' && (
+                   <div className="flex items-center space-x-2">
+                     <span className="text-xs w-24">Radius</span>
+                     <Slider value={circularValueArr} min={120} max={600} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, circularRadius: v[0]}))} className="flex-1" />
+                     <span className="text-xs w-10 text-right">{layoutOptions.circularRadius}</span>
+                   </div>
+                 )}
+                 {layoutMode === 'hierarchical' && (
+                   <div className="flex items-center space-x-2">
+                     <span className="text-xs w-24">Layer gap</span>
+                     <Slider value={hierValueArr} min={80} max={400} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, hierarchicalDistance: v[0]}))} className="flex-1" />
+                     <span className="text-xs w-10 text-right">{layoutOptions.hierarchicalDistance}</span>
+                   </div>
+                 )}
+               </div>
+             </div>
 
             <div>
               <label className="text-sm font-medium mb-2 block">Graph Controls</label>
@@ -344,7 +606,7 @@ function SimpleTopology() {
                   All Off
                 </Button>
                 <Button
-                  onClick={() => { try { graphRef.current?.d3ReheatSimulation?.(); graphRef.current?.zoomToFit?.(400) } catch(_) {} }}
+                  onClick={handleResetLayout}
                   variant="outline"
                   size="sm"
                   aria-label="Reset layout"
@@ -352,11 +614,206 @@ function SimpleTopology() {
                   <RotateCcw className="w-4 h-4 mr-1" />
                   Reset Layout
                 </Button>
+
+                <Dialog open={showMiniMapDialog} onOpenChange={setShowMiniMapDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" aria-label="Open mini-map navigator">
+                      <Maximize className="w-4 h-4 mr-1" />
+                      Mini-map
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center space-x-2">
+                        <Network className="w-5 h-5" />
+                        <span>Mini-map Navigator</span>
+                      </DialogTitle>
+                      <DialogDescription>
+                        Interactive overview of the complete topology. Click nodes/links to navigate, use controls below for customization.
+                        <br />
+                        <span className="text-xs text-muted-foreground mt-1 block">
+                          Keyboard: Ctrl+M (close), Ctrl+± (zoom), Ctrl+0 (reset zoom)
+                        </span>
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      {/* Mini-map Controls */}
+                      <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <label className="text-sm font-medium">Zoom:</label>
+                            <Slider
+                              value={[miniMapZoom]}
+                              onValueChange={(value) => setMiniMapZoom(value[0])}
+                              min={0.1}
+                              max={3}
+                              step={0.1}
+                              className="w-20"
+                            />
+                            <span className="text-xs text-muted-foreground w-8">{miniMapZoom.toFixed(1)}x</span>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <label className="text-sm font-medium">Opacity:</label>
+                            <Slider
+                              value={[miniMapOpacity]}
+                              onValueChange={(value) => setMiniMapOpacity(value[0])}
+                              min={0.1}
+                              max={1}
+                              step={0.1}
+                              className="w-20"
+                            />
+                            <span className="text-xs text-muted-foreground w-8">{Math.round(miniMapOpacity * 100)}%</span>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <label className="text-sm font-medium">Size:</label>
+                            <Slider
+                              value={[miniMapSize]}
+                              onValueChange={(value) => setMiniMapSize(value[0])}
+                              min={200}
+                              max={600}
+                              step={50}
+                              className="w-20"
+                            />
+                            <span className="text-xs text-muted-foreground w-12">{miniMapSize}px</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            onClick={() => {
+                              if (miniMapRef.current) {
+                                try { miniMapRef.current.zoomToFit(400) } catch(_) {}
+                              }
+                            }}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <Maximize className="w-4 h-4 mr-1" />
+                            Fit View
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Mini-map Visualization */}
+                      <div
+                        className="border rounded-lg overflow-hidden bg-background"
+                        style={{ height: miniMapSize, opacity: miniMapOpacity }}
+                      >
+                        <ForceGraph2D
+                          ref={miniMapRef}
+                          graphData={graphData}
+                          width={miniMapSize}
+                          height={miniMapSize}
+                          nodeLabel=""
+                          nodeColor={(node) => node.color}
+                          nodeVal={(node) => node.size * miniMapZoom}
+                          linkColor={(link) => link.color}
+                          linkWidth={(link) => link.width * miniMapZoom}
+                          linkDirectionalArrowLength={2 * miniMapZoom}
+                          linkDirectionalArrowRelPos={1}
+                          minMap={false}
+                          dagMode={layoutMode === 'hierarchical' ? 'td' : undefined}
+                          dagLevelDistance={layoutMode === 'hierarchical' ? layoutOptions.hierarchicalDistance : undefined}
+                          onNodeClick={(node) => {
+                            // Sync with main graph
+                            if (graphRef.current) {
+                              graphRef.current.centerAt(node.x, node.y, 1000)
+                              graphRef.current.zoom(2, 1000)
+                            }
+                            setShowMiniMapDialog(false)
+                          }}
+                          onLinkClick={(link) => {
+                            // Center on link midpoint
+                            const sourceNode = graphData.nodes.find(n => n.id === link.source)
+                            const targetNode = graphData.nodes.find(n => n.id === link.target)
+                            if (sourceNode && targetNode && graphRef.current) {
+                              const midX = (sourceNode.x + targetNode.x) / 2
+                              const midY = (sourceNode.y + targetNode.y) / 2
+                              graphRef.current.centerAt(midX, midY, 1000)
+                              graphRef.current.zoom(1.5, 1000)
+                            }
+                            setShowMiniMapDialog(false)
+                          }}
+                          nodeCanvasObject={(node, ctx) => {
+                            if (!isNodeVisible(node)) return
+                            const radius = node.size * miniMapZoom
+                            ctx.fillStyle = node.color
+                            ctx.beginPath()
+                            ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false)
+                            ctx.fill()
+                          }}
+                        />
+                      </div>
+
+                      {/* Off-screen Elements Notification */}
+                      {offScreenNodes.length > 0 && (
+                        <div className="p-3 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Eye className="w-4 h-4 text-yellow-600" />
+                              <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                {offScreenNodes.length} nodes outside current view
+                              </span>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                if (graphRef.current) {
+                                  graphRef.current.zoomToFit(400)
+                                }
+                              }}
+                              variant="outline"
+                              size="sm"
+                            >
+                              Show All
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Statistics */}
+                      <div className="grid grid-cols-4 gap-4 text-sm">
+                        <div className="text-center p-2 bg-muted/50 rounded">
+                          <div className="font-semibold">{filteredNodes.length}</div>
+                          <div className="text-muted-foreground">Visible Nodes</div>
+                        </div>
+                        <div className="text-center p-2 bg-muted/50 rounded">
+                          <div className="font-semibold">{filteredLinks.length}</div>
+                          <div className="text-muted-foreground">Visible Edges</div>
+                        </div>
+                        <div className="text-center p-2 bg-muted/50 rounded">
+                          <div className="font-semibold">{graphData.nodes.length}</div>
+                          <div className="text-muted-foreground">Total Nodes</div>
+                        </div>
+                        <div className="text-center p-2 bg-muted/50 rounded">
+                          <div className="font-semibold">{timeRange}</div>
+                          <div className="text-muted-foreground">Time Range</div>
+                        </div>
+                      </div>
+
+                      {/* Legend */}
+                      <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg">
+                        <span className="text-sm font-medium mr-2">Legend:</span>
+                        {Object.entries(nodeConfig).filter(([key]) => key !== 'default').slice(0, 4).map(([type, config]) => (
+                          <div key={type} className="flex items-center space-x-1">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: config.color }}
+                            />
+                            <span className="text-xs">{type}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Legend</label>
+              <label className="text-sm font-medium mb-2 block">Node Types</label>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(nodeConfig).filter(([key]) => key !== 'default').map(([type, config]) => (
                   <Badge
@@ -377,6 +834,22 @@ function SimpleTopology() {
                 ))}
               </div>
             </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Edge Types</label>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(edgeConfig).filter(([key]) => key !== 'default').map(([type, config]) => (
+                  <Badge
+                    key={type}
+                    variant="default"
+                    className="flex items-center space-x-1"
+                  >
+                    <div className="w-2 h-1 rounded" style={{ backgroundColor: config.color }} />
+                    <span className="text-xs">{type}</span>
+                  </Badge>
+                ))}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -387,15 +860,15 @@ function SimpleTopology() {
         {/* Graph Visualization */}
         <div className={fullPage ? "lg:col-span-1" : "lg:col-span-3"}>
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Network className="w-5 h-5" />
-                <span>Network Graph - ELI Demo System</span>
-              </CardTitle>
-              <CardDescription>
-                Click and drag to explore. Click nodes or edges for details. This shows the actual structure of your Lima camera system.
-              </CardDescription>
-            </CardHeader>
+           <CardHeader>
+             <CardTitle className="flex items-center space-x-2">
+               <Network className="w-5 h-5" />
+               <span>Network Graph</span>
+             </CardTitle>
+             <CardDescription>
+               Click and drag to explore. Click nodes or edges for details.
+             </CardDescription>
+           </CardHeader>
             <CardContent>
               <div className="h-96 rounded-lg overflow-hidden border relative">
                 {loading && (
@@ -416,6 +889,8 @@ function SimpleTopology() {
                   nodeLabel={''}
                   nodeColor={() => undefined}
                   nodeVal={(node) => node.size}
+                  dagMode={layoutMode === 'hierarchical' ? 'td' : undefined}
+                  dagLevelDistance={layoutMode === 'hierarchical' ? layoutOptions.hierarchicalDistance : undefined}
                   linkColor={(link) => {
                     const base = (selectedEdge && link === selectedEdge) ? '#ff6b35' : (link.color || '#999')
                     const toRgba = (hex, a) => {
@@ -451,7 +926,6 @@ function SimpleTopology() {
                   }}
                   linkDirectionalArrowLength={(link) => (isLinkVisible(link) ? 3 : 0)}
                   linkDirectionalArrowRelPos={1}
-                  minMap={true}
                   onNodeClick={handleNodeClick}
                   onLinkClick={handleEdgeClick}
                   // Replace default node drawing so we control circles vs images
@@ -486,7 +960,11 @@ function SimpleTopology() {
                         img.onload = () => {
                           imageCacheRef.current.set(url, img)
                           if (graphRef.current) {
-                            try { graphRef.current.refresh() } catch (_) {}
+                            try {
+                              if (graphRef.current.d3ReheatSimulation) {
+                                graphRef.current.d3ReheatSimulation()
+                              }
+                            } catch (_) {}
                           }
                         }
                         img.onerror = () => {

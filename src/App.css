@@ -84,38 +84,6 @@
   }
 }
 
-/* Enhanced Mini-Map Styles */
-.graph-minimap {
-  position: absolute !important;
-  bottom: 10px !important;
-  right: 10px !important;
-  width: 150px !important;
-  height: 100px !important;
-  border: 2px solid rgba(0, 0, 0, 0.2) !important;
-  border-radius: 8px !important;
-  background: rgba(255, 255, 255, 0.9) !important;
-  backdrop-filter: blur(10px) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-  z-index: 1000 !important;
-  overflow: hidden !important;
-}
-
-.dark .graph-minimap {
-  background: rgba(0, 0, 0, 0.8) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-.graph-minimap canvas {
-  border-radius: 6px !important;
-}
-
-/* Mini-map viewport indicator */
-.graph-minimap-viewport {
-  position: absolute !important;
-  border: 2px solid #3b82f6 !important;
-  background: rgba(59, 130, 246, 0.1) !important;
-  pointer-events: none !important;
-}
 
 /* Enhanced tooltips */
 .graph-tooltip {
@@ -213,13 +181,6 @@
 
 /* Responsive design */
 @media (max-width: 768px) {
-  .graph-minimap {
-    width: 120px !important;
-    height: 80px !important;
-    bottom: 5px !important;
-    right: 5px !important;
-  }
-
   .graph-tooltip {
     max-width: 150px;
     font-size: 11px;
