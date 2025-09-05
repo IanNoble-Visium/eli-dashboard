@@ -163,6 +163,9 @@ function TableView() {
   const [filterLevel, setFilterLevel] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [selectedRecord, setSelectedRecord] = useState(null)
+  const [selectedSnapshot, setSelectedSnapshot] = useState(null)
+  const [totalEvents, setTotalEvents] = useState(0)
+  const [totalSnapshots, setTotalSnapshots] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
@@ -193,11 +196,13 @@ function TableView() {
       if (eventsResponse.ok) {
         const eventsData = await eventsResponse.json()
         setEvents(eventsData.events || [])
+        setTotalEvents(eventsData.total || eventsData.totalCount || eventsData.events?.length || 0)
       }
 
       if (snapshotsResponse.ok) {
         const snapshotsData = await snapshotsResponse.json()
         setSnapshots(snapshotsData.snapshots || [])
+        setTotalSnapshots(snapshotsData.total || snapshotsData.totalCount || snapshotsData.snapshots?.length || 0)
       }
 
     } catch (err) {
@@ -206,6 +211,8 @@ function TableView() {
       // Use sample data as fallback
       setEvents(sampleEvents)
       setSnapshots(sampleSnapshots)
+      setTotalEvents(sampleEvents.length)
+      setTotalSnapshots(sampleSnapshots.length)
     } finally {
       setLoading(false)
     }
@@ -245,7 +252,8 @@ function TableView() {
 
   // Pagination logic
   const currentData = activeTab === 'events' ? filteredEvents : filteredSnapshots
-  const totalPages = Math.max(1, Math.ceil(currentData.length / itemsPerPage))
+  const totalCount = activeTab === 'events' ? totalEvents : totalSnapshots
+  const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedData = currentData.slice(startIndex, startIndex + itemsPerPage)
 
@@ -298,12 +306,12 @@ function TableView() {
         <div className="flex items-center space-x-4">
           <Badge variant="outline" className="flex items-center space-x-1">
             <Database className="w-3 h-3" />
-            <span>{events.length} events</span>
+            <span>{totalEvents} events</span>
           </Badge>
 
           <Badge variant="outline" className="flex items-center space-x-1">
             <ImageIcon className="w-3 h-3" />
-            <span>{snapshots.length} snapshots</span>
+            <span>{totalSnapshots} snapshots</span>
           </Badge>
 
 
@@ -328,7 +336,7 @@ function TableView() {
                   setCurrentPage(1)
                 }}
               >
-                Events ({events.length})
+                Events ({totalEvents})
               </Button>
               <Button
                 variant={activeTab === 'snapshots' ? 'default' : 'outline'}
@@ -337,7 +345,7 @@ function TableView() {
                   setCurrentPage(1)
                 }}
               >
-                Snapshots ({snapshots.length})
+                Snapshots ({totalSnapshots})
               </Button>
             </div>
 
@@ -529,11 +537,38 @@ function TableView() {
                 </Table>
               )}
 
+              {/* Snapshot Preview Dialog */}
+              {selectedSnapshot && (
+                <Dialog open={!!selectedSnapshot} onOpenChange={() => setSelectedSnapshot(null)}>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>Snapshot Preview</DialogTitle>
+                      <DialogDescription>
+                        {selectedSnapshot.id} - {selectedSnapshot.path}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-center">
+                      <img
+                        src={selectedSnapshot.image_url || (selectedSnapshot.path.startsWith('http') ? selectedSnapshot.path : `${API_BASE}${selectedSnapshot.path}`)}
+                        alt={`Snapshot ${selectedSnapshot.id}`}
+                        className="max-w-full max-h-96 object-contain"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjMyIiB5PSIzMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zNWVtIiBmaWxsPSIjOUI5QkE0IiBmb250LXNpemU9IjEwIj5ObyBJbWFnZTwvdGV4dD4KPHN2Zz4='
+                          e.target.alt = 'Image not available'
+                        }}
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+
               {/* Snapshots Table */}
               {activeTab === 'snapshots' && (
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Thumbnail</TableHead>
                       <TableHead>ID</TableHead>
                       <TableHead>Event ID</TableHead>
                       <TableHead>Path</TableHead>
@@ -547,6 +582,19 @@ function TableView() {
                   <TableBody>
                     {paginatedData.map((snapshot) => (
                       <TableRow key={snapshot.id}>
+                        <TableCell>
+                          <img
+                            src={snapshot.image_url || (snapshot.path.startsWith('http') ? snapshot.path : `${API_BASE}${snapshot.path}`)}
+                            alt={`Snapshot ${snapshot.id}`}
+                            className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                            crossOrigin="anonymous"
+                            onClick={() => setSelectedSnapshot(snapshot)}
+                            onError={(e) => {
+                              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjMyIiB5PSIzMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zNWVtIiBmaWxsPSIjOUI5QkE0IiBmb250LXNpemU9IjEwIj5ObyBJbWFnZTwvdGV4dD4KPHN2Zz4='
+                              e.target.alt = 'Image not available'
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="font-mono text-sm">{snapshot.id}</TableCell>
                         <TableCell className="font-mono text-sm">{snapshot.event_id}</TableCell>
                         <TableCell className="font-mono text-xs max-w-xs truncate">
@@ -559,7 +607,7 @@ function TableView() {
                         <TableCell>{formatTimestamp(snapshot.created_at)}</TableCell>
                         <TableCell>
                           <div className="text-xs">
-                            {snapshot.metadata.width}x{snapshot.metadata.height} {snapshot.metadata.format}
+                            {snapshot.metadata ? `${snapshot.metadata.width}x${snapshot.metadata.height} ${snapshot.metadata.format}` : 'N/A'}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -584,7 +632,7 @@ function TableView() {
               {/* Pagination */}
               <div className="flex items-center justify-between mt-6">
                 <div className="text-sm text-muted-foreground">
-                  Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, currentData.length)} of {currentData.length} records
+                  Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, totalCount)} of {totalCount} records
                 </div>
 
                 <div className="flex items-center space-x-2">

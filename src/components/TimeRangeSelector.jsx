@@ -35,7 +35,7 @@ const Histogram = React.memo(function Histogram({ bins }) {
 })
 
 
-export default function TimeRangeSelector({ className }) {
+export default function TimeRangeSelector({ className, onEventCountChange }) {
   const { timeRange, setTimeRange, setAbsoluteRange, clearAbsoluteRange } = useTimeRange()
   const { authFetch, isAuthenticated } = useAuth()
   const [bins, setBins] = useState([])
@@ -75,6 +75,13 @@ export default function TimeRangeSelector({ className }) {
     return sum
   }, [bins, rangePct])
 
+  // Notify parent component of event count changes
+  useEffect(() => {
+    if (onEventCountChange) {
+      onEventCountChange({ filtered: filteredTotal, total })
+    }
+  }, [filteredTotal, total])
+
   // As the handles move, publish an absoluteRange override (debounced at context level).
   // Important: this effect runs only on slider changes; publishing to context is cheap.
   useEffect(() => {
@@ -104,17 +111,8 @@ export default function TimeRangeSelector({ className }) {
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2 flex-wrap">
-        {PRESETS.map(p => (
-          <Button key={p.value} size="sm" variant={timeRange === p.value ? 'default' : 'outline'} onClick={() => setTimeRange(p.value)}>
-            Last {p.label}
-          </Button>
-        ))}
-        <div className="text-xs text-muted-foreground ml-auto">{filteredTotal.toLocaleString()} / {total.toLocaleString()} events in view</div>
-      </div>
-
-      <Card className="mt-3">
-        <CardContent className="pt-4">
+      <Card>
+        <CardContent className="pt-3 pb-3">
           {/* Histogram bars */}
           <Histogram bins={bins} />
 

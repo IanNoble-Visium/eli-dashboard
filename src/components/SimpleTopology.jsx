@@ -57,6 +57,7 @@ function SimpleTopology() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [fullPage, setFullPage] = useState(false)
+  const [visibleNodeTypes, setVisibleNodeTypes] = useState(Object.keys(nodeConfig).filter(key => key !== 'default'))
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const { authFetch, isAuthenticated } = useAuth()
   const graphRef = useRef()
@@ -172,8 +173,13 @@ function SimpleTopology() {
     return stats
   }
 
-  const nodeStats = getNodeStats()
-  const edgeStats = getEdgeStats()
+  const filteredNodes = graphData.nodes.filter(node => visibleNodeTypes.includes(node.type))
+  const nodeIds = new Set(filteredNodes.map(n => n.id))
+  const filteredLinks = graphData.links.filter(link => nodeIds.has(link.source) && nodeIds.has(link.target))
+  const filteredGraphData = { nodes: filteredNodes, links: filteredLinks }
+
+  const nodeStats = getNodeStats(filteredNodes)
+  const edgeStats = getEdgeStats(filteredLinks)
 
 
   return (
@@ -190,12 +196,12 @@ function SimpleTopology() {
         <div className="flex items-center space-x-4">
           <Badge variant="outline" className="flex items-center space-x-1">
             <Network className="w-3 h-3" />
-            <span>{graphData.nodes.length} nodes</span>
+            <span>{filteredNodes.length} nodes</span>
           </Badge>
 
           <Badge variant="outline" className="flex items-center space-x-1">
             <Activity className="w-3 h-3" />
-            <span>{graphData.links.length} edges</span>
+            <span>{filteredLinks.length} edges</span>
           </Badge>
 
           <Badge variant={isLive ? "default" : "secondary"}>{isLive ? 'Live Data' : 'Demo Data'}</Badge>
@@ -253,7 +259,18 @@ function SimpleTopology() {
               <label className="text-sm font-medium mb-2 block">Legend</label>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(nodeConfig).filter(([key]) => key !== 'default').map(([type, config]) => (
-                  <Badge key={type} variant="outline" className="flex items-center space-x-1">
+                  <Badge
+                    key={type}
+                    variant={visibleNodeTypes.includes(type) ? "default" : "outline"}
+                    className="cursor-pointer flex items-center space-x-1"
+                    onClick={() => {
+                      if (visibleNodeTypes.includes(type)) {
+                        setVisibleNodeTypes(visibleNodeTypes.filter(t => t !== type))
+                      } else {
+                        setVisibleNodeTypes([...visibleNodeTypes, type])
+                      }
+                    }}
+                  >
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
                     <span className="text-xs">{type}</span>
                   </Badge>
@@ -291,7 +308,7 @@ function SimpleTopology() {
                 )}
                 <ForceGraph2D
                   ref={graphRef}
-                  graphData={graphData}
+                  graphData={filteredGraphData}
                   width={graphWidth}
                   height={graphHeight}
                   nodeLabel={''}
@@ -431,7 +448,17 @@ function SimpleTopology() {
                   <h4 className="font-medium mb-2">Node Types</h4>
                   <div className="space-y-2">
                     {Object.entries(nodeStats).map(([type, count]) => (
-                      <div key={type} className="flex justify-between items-center">
+                      <div
+                        key={type}
+                        className="flex justify-between items-center cursor-pointer hover:bg-muted/50 p-1 rounded"
+                        onClick={() => {
+                          if (visibleNodeTypes.includes(type)) {
+                            setVisibleNodeTypes(visibleNodeTypes.filter(t => t !== type))
+                          } else {
+                            setVisibleNodeTypes([...visibleNodeTypes, type])
+                          }
+                        }}
+                      >
                         <div className="flex items-center space-x-2">
                           <div
                             className="w-3 h-3 rounded-full"
