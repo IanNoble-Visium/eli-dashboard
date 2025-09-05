@@ -275,12 +275,7 @@ function ExecutiveDashboard() {
     <div className="space-y-3">
       {/* Integrated Time Range Control & Information Panel */}
       <Card className="border-l-4 border-l-primary">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-semibold flex items-center space-x-2">
-            <Calendar className="w-5 h-5" />
-            <span>Time Range Control</span>
-          </CardTitle>
-        </CardHeader>
+
         <CardContent className="space-y-3">
           {/* Time Range Selector Integration */}
           <div className="w-full">

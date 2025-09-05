@@ -219,7 +219,6 @@ function SimpleTopology() {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <div>
-              <label className="text-sm font-medium mb-2 block">Time Range</label>
               <TimeRangeSelector />
             </div>
 
