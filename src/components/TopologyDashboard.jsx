@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import {
   Network,
@@ -66,8 +66,17 @@ export function TopologyDashboard() {
     images: true
   })
   const [hoveredNode, setHoveredNode] = useState(null)
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const graphRef = useRef()
   const tooltipRef = useRef()
+
+  // Debounce search term for performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   const fetchGraphData = async () => {
     try {
@@ -197,7 +206,7 @@ export function TopologyDashboard() {
     }
   }
 
-  const handleExport = (format) => {
+  const handleExport = useCallback((format) => {
     if (!graphRef.current) return
 
     const canvas = graphRef.current.canvas
@@ -213,33 +222,38 @@ export function TopologyDashboard() {
       // This is a placeholder for future implementation
       console.log('SVG export not yet implemented')
     }
-  }
+  }, [])
 
-  const filteredNodes = graphData.nodes.filter(node =>
-    node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    node.type.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredNodes = useMemo(() =>
+    graphData.nodes.filter(node =>
+      node.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      node.type.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    ), [graphData.nodes, debouncedSearchTerm]
   )
 
-  const filteredLinks = graphData.links.filter(link =>
-    filteredNodes.some(node => node.id === link.source) &&
-    filteredNodes.some(node => node.id === link.target)
+  const filteredLinks = useMemo(() =>
+    graphData.links.filter(link =>
+      filteredNodes.some(node => node.id === link.source) &&
+      filteredNodes.some(node => node.id === link.target)
+    ), [graphData.links, filteredNodes]
   )
 
-  const getNodeStats = () => {
+  const nodeStats = useMemo(() => {
     const stats = {}
     filteredNodes.forEach(node => {
       stats[node.type] = (stats[node.type] || 0) + 1
     })
     return stats
-  }
+  }, [filteredNodes])
 
-  const getEdgeStats = () => {
+  const edgeStats = useMemo(() => {
     const stats = {}
     filteredLinks.forEach(link => {
       stats[link.type] = (stats[link.type] || 0) + 1
     })
     return stats
-  }
+  }, [filteredLinks])
+
 
   if (loading) {
     return (
@@ -255,8 +269,6 @@ export function TopologyDashboard() {
     )
   }
 
-  const nodeStats = getNodeStats()
-  const edgeStats = getEdgeStats()
 
   return (
     <div className="space-y-6">
@@ -269,15 +281,17 @@ export function TopologyDashboard() {
           </p>
         </div>
         
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <Badge variant="outline" className="flex items-center space-x-1">
             <Network className="w-3 h-3" />
-            <span>{filteredNodes.length} nodes</span>
+            <span className="hidden sm:inline">{filteredNodes.length} nodes</span>
+            <span className="sm:hidden">{filteredNodes.length}</span>
           </Badge>
 
           <Badge variant="outline" className="flex items-center space-x-1">
             <Activity className="w-3 h-3" />
-            <span>{filteredLinks.length} edges</span>
+            <span className="hidden sm:inline">{filteredLinks.length} edges</span>
+            <span className="sm:hidden">{filteredLinks.length}</span>
           </Badge>
 
           <Button onClick={fetchGraphData} variant="outline" size="sm">
@@ -314,7 +328,7 @@ export function TopologyDashboard() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Depth Level</label>
               <Slider
@@ -416,9 +430,9 @@ export function TopologyDashboard() {
       )}
 
       {/* Graph and Details */}
-      <div className={`grid grid-cols-1 ${fullPage ? 'lg:grid-cols-1' : 'lg:grid-cols-4'} gap-6`}>
+      <div className={`grid grid-cols-1 ${fullPage ? 'lg:grid-cols-1' : 'lg:grid-cols-4 xl:grid-cols-5'} gap-4 md:gap-6`}>
         {/* Graph Visualization */}
-        <div className={fullPage ? "lg:col-span-1" : "lg:col-span-3"}>
+        <div className={fullPage ? "lg:col-span-1" : "lg:col-span-3 xl:col-span-4"}>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -439,7 +453,7 @@ export function TopologyDashboard() {
                 </div>
               ) : null}
               
-              <div className="h-96 rounded-lg overflow-hidden border relative">
+              <div className="h-80 sm:h-96 rounded-lg overflow-hidden border relative">
                 <ForceGraph2D
                   ref={graphRef}
                   graphData={{ nodes: filteredNodes, links: filteredLinks }}
@@ -456,7 +470,7 @@ export function TopologyDashboard() {
                   minMapClass="graph-minimap"
                   onNodeClick={handleNodeClick}
                   onNodeHover={handleNodeHover}
-                  nodeCanvasObject={(node, ctx, globalScale) => {
+                  nodeCanvasObject={useCallback((node, ctx, globalScale) => {
                     if (!layers.nodes) return
 
                     const label = node.name
@@ -476,7 +490,7 @@ export function TopologyDashboard() {
                       ctx.fillStyle = '#000'
                       ctx.fillText(label, node.x, node.y + node.size + fontSize)
                     }
-                  }}
+                  }, [layers.nodes, layers.labels, showLabels])}
                 />
 
                 {/* Tooltip */}

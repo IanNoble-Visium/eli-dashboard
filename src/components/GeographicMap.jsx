@@ -14,7 +14,12 @@ import {
   Minimize2,
   Minus,
   Square,
-  Move
+  Move,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Pause,
+  RotateCcw
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -758,7 +763,7 @@ export function GeographicMap() {
                                       className="h-6 w-6 p-0"
                                       aria-label="Previous image"
                                     >
-                                      ‹
+                                      <ChevronLeft className="w-3 h-3" aria-hidden="true" />
                                     </Button>
                                     <Button
                                       size="sm"
@@ -767,7 +772,7 @@ export function GeographicMap() {
                                       className="h-6 w-6 p-0"
                                       aria-label={tooltipPlaying ? "Pause slideshow" : "Play slideshow"}
                                     >
-                                      {tooltipPlaying ? '⏸' : '▶'}
+                                      {tooltipPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                                     </Button>
                                     <Button
                                       size="sm"
@@ -776,7 +781,7 @@ export function GeographicMap() {
                                       className="h-6 w-6 p-0"
                                       aria-label="Next image"
                                     >
-                                      ›
+                                      <ChevronRight className="w-3 h-3" aria-hidden="true" />
                                     </Button>
                                   </div>
                                   <div className="flex items-center space-x-1">
