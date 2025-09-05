@@ -21,7 +21,6 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { useTimeRange } from '@/context/TimeRangeContext'
@@ -109,8 +108,7 @@ function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [eventCounts, setEventCounts] = useState({ filtered: 0, total: 0 })
-  const [eventTypeFilter, setEventTypeFilter] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
+
 
   const fetchDashboardData = async () => {
     try {
@@ -124,8 +122,6 @@ function ExecutiveDashboard() {
       } else {
         baseParams.set('timeRange', debouncedTimeRange)
       }
-      if (eventTypeFilter && eventTypeFilter !== 'all') baseParams.set('eventType', eventTypeFilter)
-      if (categoryFilter && categoryFilter !== 'all') baseParams.set('category', categoryFilter)
 
       // Fetch metrics
       const metricsResponse = await authFetch(`${API_BASE}/dashboard/metrics?${baseParams.toString()}`)
@@ -163,7 +159,7 @@ function ExecutiveDashboard() {
       clearInterval(interval)
       window.removeEventListener('dashboard-refresh', handleDashboardRefresh)
     }
-  }, [debouncedTimeRange, debouncedAbsoluteRange, isAuthenticated, eventTypeFilter, categoryFilter])
+  }, [debouncedTimeRange, debouncedAbsoluteRange, isAuthenticated])
 
   // Refresh data function for manual refresh
   const handleRefreshData = async () => {
@@ -277,38 +273,6 @@ function ExecutiveDashboard() {
           {/* Time Range Selector Integration */}
           <div className="w-full">
             <TimeRangeSelector onEventCountChange={handleEventCountChange} />
-          </div>
-
-          {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Event Type</label>
-              <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All event types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All event types</SelectItem>
-                  {metrics?.eventTypes?.map(type => (
-                    <SelectItem key={type.topic} value={type.topic}>{type.topic}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Category</label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  <SelectItem value="security">Security</SelectItem>
-                  <SelectItem value="operational">Operational</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           {/* Time Range Information Grid */}

@@ -1,21 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import TinyPresetBar from '@/components/TinyPresetBar'
 import { Slider } from '@/components/ui/slider'
 import { useTimeRange } from '@/context/TimeRangeContext'
 import { useAuth } from '@/context/AuthContext'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 
-const PRESETS = [
-  { label: '30m', value: '30m' },
-  { label: '1h', value: '1h' },
-  { label: '4h', value: '4h' },
-  { label: '12h', value: '12h' },
-  { label: '24h', value: '24h' },
-  { label: '7d', value: '7d' },
-  { label: '30d', value: '30d' },
-]
 const Bars = ({ bins }) => {
   if (!bins || bins.length === 0) return <div className="text-xs text-muted-foreground">No activity data</div>
   const max = Math.max(1, ...bins.map(b => b.v))
@@ -112,21 +103,9 @@ export default function TimeRangeSelector({ className, onEventCountChange }) {
   return (
     <div className={className}>
       <Card>
-        <CardContent className="pt-3 pb-3">
+        <CardContent className="py-2">
           {/* Preset quick selections */}
-          <div className="flex flex-wrap gap-1 mb-3">
-            {PRESETS.slice(0,5).map(p => (
-              <Button
-                key={p.value}
-                variant={timeRange === p.value ? 'default' : 'outline'}
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={() => setTimeRange(p.value)}
-              >
-                Last {p.label}
-              </Button>
-            ))}
-          </div>
+          <TinyPresetBar timeRange={timeRange} setTimeRange={setTimeRange} className="mb-2" />
 
           {/* Histogram bars */}
           <Histogram bins={bins} />

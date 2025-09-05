@@ -180,11 +180,11 @@ export function TopologyDashboard() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Network Topology</h1>
+          <h1 className="text-3xl font-bold">Topology</h1>
           <div className="animate-pulse bg-muted h-10 w-32 rounded"></div>
         </div>
         <div className="h-96 bg-muted rounded-lg animate-pulse flex items-center justify-center">
-          <p>Loading network topology...</p>
+          <p>Loading topology...</p>
         </div>
       </div>
     )
@@ -198,7 +198,7 @@ export function TopologyDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Network Topology</h1>
+          <h1 className="text-3xl font-bold">Topology</h1>
           <p className="text-muted-foreground">
             Interactive graph visualization of camera, event, and image relationships
           </p>

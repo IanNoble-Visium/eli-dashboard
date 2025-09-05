@@ -187,7 +187,7 @@ function SimpleTopology() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Network Topology</h1>
+          <h1 className="text-3xl font-bold">Topology</h1>
           <p className="text-muted-foreground">
             Interactive graph visualization of camera, event, and image relationships
           </p>

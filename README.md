@@ -93,7 +93,7 @@ The dashboard features a robust authentication system with JWT tokens and sessio
 - Click-to-view event details
 - Professional legend and controls
 
-### Network Topology
+### Topology
 - Interactive force-directed graph
 - Camera → Events → Snapshots → Tags relationships
 - Node details and statistics
@@ -383,7 +383,7 @@ All dashboard components now use the centralized authentication system with enha
 
 ✅ **Executive Dashboard** - Optimized layout with dynamic event counting and unified time range controls
 ✅ **Geographic Map** - Interactive map with terrain features and hover previews
-✅ **Network Topology** - Force-directed graph visualization
+✅ **Topology** - Force-directed graph visualization
 ✅ **Data Management** - Comprehensive table with CRUD operations
 ✅ **Global Search** - Advanced search across all data types
 ✅ **Real-time Updates** - Live monitoring with synchronized data across all components

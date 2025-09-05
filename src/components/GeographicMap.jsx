@@ -134,7 +134,7 @@ export function GeographicMap() {
         params.set('start', String(debouncedAbsoluteRange.start))
         params.set('end', String(debouncedAbsoluteRange.end))
       } else {
-        params.set('timeRange', timeRange)
+        params.set('timeRange', debouncedTimeRange)
       }
       if (eventType && eventType !== 'all') params.append('eventType', eventType)
       const url = `${API_BASE}/events/geo?${params}`
