@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 const navigation = [
   { name: 'Executive Dashboard', href: '/dashboard', icon: BarChart3 },
   { name: 'Geographic Map', href: '/map', icon: Map },
-  { name: 'Network Topology', href: '/topology', icon: Network },
+  { name: 'Topology', href: '/topology', icon: Network },
   { name: 'Data Table', href: '/table', icon: Table },
   { name: 'Search', href: '/search', icon: Search },
 ]

@@ -27,8 +27,6 @@ import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { useTimeRange } from '@/context/TimeRangeContext'
 import { useAuth } from '@/context/AuthContext'
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
   BarChart,
@@ -104,7 +102,7 @@ const formatDuration = (start, end) => {
 function ExecutiveDashboard() {
   const [metrics, setMetrics] = useState(null)
   const [timeline, setTimeline] = useState([])
-  const { timeRange, setTimeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
+  const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const { authFetch, isAuthenticated } = useAuth()
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(new Date())

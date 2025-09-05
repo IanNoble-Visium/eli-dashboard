@@ -113,6 +113,21 @@ export default function TimeRangeSelector({ className, onEventCountChange }) {
     <div className={className}>
       <Card>
         <CardContent className="pt-3 pb-3">
+          {/* Preset quick selections */}
+          <div className="flex flex-wrap gap-1 mb-3">
+            {PRESETS.slice(0,5).map(p => (
+              <Button
+                key={p.value}
+                variant={timeRange === p.value ? 'default' : 'outline'}
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => setTimeRange(p.value)}
+              >
+                Last {p.label}
+              </Button>
+            ))}
+          </div>
+
           {/* Histogram bars */}
           <Histogram bins={bins} />
 
