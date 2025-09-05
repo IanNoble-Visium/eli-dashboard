@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react'
+import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import {
   Network,
@@ -157,29 +157,43 @@ function SimpleTopology() {
     }
   }
 
-  const getNodeStats = () => {
+
+
+  const filteredNodes = useMemo(() =>
+    graphData.nodes.filter(node => visibleNodeTypes.includes(node.type)),
+    [graphData.nodes, visibleNodeTypes]
+  )
+
+  const nodeIds = useMemo(() =>
+    new Set(filteredNodes.map(n => n.id)),
+    [filteredNodes]
+  )
+
+  const filteredLinks = useMemo(() =>
+    graphData.links.filter(link => nodeIds.has(link.source) && nodeIds.has(link.target)),
+    [graphData.links, nodeIds]
+  )
+
+  const filteredGraphData = useMemo(() => ({
+    nodes: filteredNodes,
+    links: filteredLinks
+  }), [filteredNodes, filteredLinks])
+
+  const nodeStats = useMemo(() => {
     const stats = {}
-    graphData.nodes.forEach(node => {
+    filteredNodes.forEach(node => {
       stats[node.type] = (stats[node.type] || 0) + 1
     })
     return stats
-  }
+  }, [filteredNodes])
 
-  const getEdgeStats = () => {
+  const edgeStats = useMemo(() => {
     const stats = {}
-    graphData.links.forEach(link => {
+    filteredLinks.forEach(link => {
       stats[link.type] = (stats[link.type] || 0) + 1
     })
     return stats
-  }
-
-  const filteredNodes = graphData.nodes.filter(node => visibleNodeTypes.includes(node.type))
-  const nodeIds = new Set(filteredNodes.map(n => n.id))
-  const filteredLinks = graphData.links.filter(link => nodeIds.has(link.source) && nodeIds.has(link.target))
-  const filteredGraphData = { nodes: filteredNodes, links: filteredLinks }
-
-  const nodeStats = getNodeStats(filteredNodes)
-  const edgeStats = getEdgeStats(filteredLinks)
+  }, [filteredLinks])
 
 
   return (
@@ -306,6 +320,7 @@ function SimpleTopology() {
                   </div>
                 )}
                 <ForceGraph2D
+                  key="topology-graph-stable"
                   ref={graphRef}
                   graphData={filteredGraphData}
                   width={graphWidth}
@@ -328,7 +343,7 @@ function SimpleTopology() {
                     ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI, false)
                     ctx.fill()
                   }}
-                  nodeCanvasObject={(node, ctx, globalScale) => {
+                  nodeCanvasObject={(node, ctx) => {
                     const radius = node.size
                     const isImageNode = node.type === 'Image'
                     const url = isImageNode ? (node.properties?.image_url || node.properties?.url || node.properties?.path) : null
