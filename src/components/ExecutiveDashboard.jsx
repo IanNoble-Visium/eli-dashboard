@@ -15,7 +15,6 @@ import {
   Clock,
   Eye,
   RefreshCw,
-  Calendar,
   BarChart3,
   RotateCcw
 } from 'lucide-react'
@@ -381,20 +380,7 @@ function ExecutiveDashboard() {
               </div>
             </div>
 
-            {/* Time Range Selection Buttons */}
-            <div className="flex flex-wrap gap-1">
-              {['30m', '1h', '4h', '12h', '24h'].map((range) => (
-                <Button
-                  key={range}
-                  variant={timeRange === range ? "default" : "outline"}
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => setTimeRange(range)}
-                >
-                  Last {range}
-                </Button>
-              ))}
-            </div>
+
           </div>
         </CardContent>
       </Card>
