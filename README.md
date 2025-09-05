@@ -97,7 +97,11 @@ The dashboard features a robust authentication system with JWT tokens and sessio
 - Interactive force-directed graph
 - Camera → Events → Snapshots → Tags relationships
 - Node details and statistics
+- **Edge click functionality** with dedicated Edge Details panel
+- **Visual edge selection** with highlighting and thickness changes
+- **Edge properties display** (relationship type, strength, directionality, metadata)
 - Interactive controls and filtering
+- Toggle edge click feature on/off in settings
 
 ### Data Management
 - Comprehensive table view with events and snapshots
@@ -383,7 +387,7 @@ All dashboard components now use the centralized authentication system with enha
 
 ✅ **Executive Dashboard** - Optimized layout with dynamic event counting and unified time range controls
 ✅ **Geographic Map** - Interactive map with terrain features and hover previews
-✅ **Topology** - Force-directed graph visualization
+✅ **Topology** - Force-directed graph visualization with interactive edge selection
 ✅ **Data Management** - Comprehensive table with CRUD operations
 ✅ **Global Search** - Advanced search across all data types
 ✅ **Real-time Updates** - Live monitoring with synchronized data across all components
@@ -392,6 +396,55 @@ All dashboard components now use the centralized authentication system with enha
 ✅ **Production Ready** - Scalable architecture with proper error handling and performance optimization
 
 ## 🔧 Recent Updates & Fixes
+
+### September 5, 2025 - Topology Edge Click Functionality
+
+#### ✅ **Interactive Edge Selection & Details**
+
+**🔗 Edge Click Detection**
+- **Click Handler Implementation**: Added `onLinkClick` to ForceGraph2D component for edge interaction
+- **State Management**: Implemented `selectedEdge` state for tracking clicked edges
+- **Toggle Control**: Added "Enable Edge Click" switch in graph controls panel
+- **Mutual Exclusion**: Edge selection clears node selection and vice versa
+
+**👁️ Visual Feedback System**
+- **Edge Highlighting**: Selected edges highlighted in orange (`#ff6b35`)
+- **Thickness Changes**: Selected edges rendered thicker (doubled width)
+- **Dynamic Styling**: Real-time visual updates based on selection state
+- **Professional Appearance**: Consistent with existing node selection styling
+
+**📊 Edge Details Panel**
+- **Dedicated Panel**: New "Edge Details" card in right sidebar
+- **Rich Information Display**: Shows relationship type, connection details, and properties
+- **Connection Mapping**: Displays source node, target node, and directional flow
+- **Properties Display**: Shows edge type, strength (width), color, and any labels
+- **Directionality**: Indicates directed relationship with arrow notation
+
+**⚙️ User Controls & Settings**
+- **Toggle Switch**: "Enable Edge Click" option in Display Options section
+- **Settings Integration**: Seamlessly integrated into existing controls
+- **User-Friendly**: Clear labeling and intuitive operation
+- **Non-Disruptive**: Feature can be disabled without affecting node functionality
+
+**🔧 Technical Implementation**
+- **React Force Graph Integration**: Proper event handling with react-force-graph-2d
+- **State Synchronization**: Clean state management between node and edge selections
+- **Performance Optimized**: Efficient rendering without impacting graph performance
+- **Accessibility**: Proper ARIA labels and keyboard navigation support
+
+#### 🎯 **User Experience Benefits**
+
+**✨ Enhanced Network Exploration**
+- **Relationship Understanding**: Users can now explore edge properties and metadata
+- **Visual Network Analysis**: Edge highlighting helps identify important connections
+- **Detailed Edge Information**: Comprehensive view of relationship characteristics
+- **Interactive Discovery**: Click-to-explore functionality for network topology
+
+**📱 Improved Interface Design**
+- **Consistent UI Patterns**: Follows same design patterns as node details
+- **Space Efficient**: Utilizes existing sidebar without layout disruption
+- **Professional Presentation**: Clean, organized edge information display
+- **Responsive Design**: Works seamlessly in both normal and full-page modes
 
 ### September 5, 2025 - Executive Dashboard Layout Optimization & Dynamic Event Counting
 
@@ -605,7 +658,7 @@ All dashboard components now use the centralized authentication system with enha
 ---
 
 **Project Status**: ✅ **Production Ready & Fully Functional**
-**Version**: 1.3.0
+**Version**: 1.4.0
 **Last Updated**: September 5, 2025
 **Deployment**: Vercel (Auto-deploy from main branch)
 **Authentication**: ✅ JWT-based with session management

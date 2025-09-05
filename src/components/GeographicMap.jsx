@@ -97,6 +97,18 @@ export function GeographicMap() {
   const [carouselIndex, setCarouselIndex] = useState(0)
 
   const [loadingSnapshots, setLoadingSnapshots] = useState(false)
+
+  // Tooltip image rotation state
+  const [tooltipEvent, setTooltipEvent] = useState(null)
+  const [tooltipImages, setTooltipImages] = useState([])
+  const [tooltipCurrentIndex, setTooltipCurrentIndex] = useState(0)
+  const [tooltipPlaying, setTooltipPlaying] = useState(false)
+  const [tooltipSpeed, setTooltipSpeed] = useState(2000) // default 2 seconds
+  const [tooltipZoom, setTooltipZoom] = useState(1)
+  const [tooltipPan, setTooltipPan] = useState({ x: 0, y: 0 })
+  const [tooltipLoading, setTooltipLoading] = useState(false)
+  const hoverDebounceRef = useRef(null)
+  const tooltipIntervalRef = useRef(null)
   useEffect(() => {
     if (!carouselApi) return
     const onSelect = () => setCarouselIndex(carouselApi.selectedScrollSnap?.() ?? carouselApi.selectedScrollSnap)
@@ -342,6 +354,123 @@ export function GeographicMap() {
     await openImageViewerForEvent(event) // open image modal with carousel
   }
 
+  // Tooltip image functions
+  const fetchTooltipImages = async (event) => {
+    if (!event) return []
+    setTooltipLoading(true)
+    const snaps = await fetchSnapshotsForEvent(event.id)
+    // Preload first few images
+    snaps.slice(0, 3).forEach(snap => {
+      const img = new Image()
+      img.src = snap.image_url
+    })
+    setTooltipLoading(false)
+    return snaps
+  }
+
+  const handleTooltipOpen = async (event) => {
+    if (hoverDebounceRef.current) clearTimeout(hoverDebounceRef.current)
+    hoverDebounceRef.current = setTimeout(async () => {
+      setTooltipEvent(event)
+      const images = await fetchTooltipImages(event)
+      setTooltipImages(images)
+      setTooltipCurrentIndex(0)
+      setTooltipPlaying(true)
+      setTooltipZoom(1)
+      setTooltipPan({ x: 0, y: 0 })
+      if (images.length > 1) {
+        startTooltipRotation(images)
+      }
+    }, 150)
+  }
+
+  const handleTooltipClose = () => {
+    setTooltipEvent(null)
+    setTooltipImages([])
+    setTooltipCurrentIndex(0)
+    setTooltipPlaying(false)
+    stopTooltipRotation()
+  }
+
+  const startTooltipRotation = (images = tooltipImages) => {
+    if (tooltipIntervalRef.current) clearInterval(tooltipIntervalRef.current)
+    if (images.length > 1) {
+      tooltipIntervalRef.current = setInterval(() => {
+        setTooltipCurrentIndex(prev => (prev + 1) % images.length)
+      }, tooltipSpeed)
+    }
+  }
+
+  const stopTooltipRotation = () => {
+    if (tooltipIntervalRef.current) {
+      clearInterval(tooltipIntervalRef.current)
+      tooltipIntervalRef.current = null
+    }
+  }
+
+  const toggleTooltipPlayPause = () => {
+    setTooltipPlaying(prev => {
+      if (prev) {
+        stopTooltipRotation()
+      } else {
+        startTooltipRotation()
+      }
+      return !prev
+    })
+  }
+
+  const nextTooltipImage = () => {
+    setTooltipCurrentIndex(prev => (prev + 1) % tooltipImages.length)
+  }
+
+  const prevTooltipImage = () => {
+    setTooltipCurrentIndex(prev => (prev - 1 + tooltipImages.length) % tooltipImages.length)
+  }
+
+  const handleTooltipSpeedChange = (speed) => {
+    setTooltipSpeed(speed)
+    if (tooltipPlaying && tooltipImages.length > 1) {
+      startTooltipRotation()
+    }
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!tooltipEvent) return
+      switch (e.key) {
+        case ' ':
+          e.preventDefault()
+          toggleTooltipPlayPause()
+          break
+        case '+':
+        case '=':
+          e.preventDefault()
+          setTooltipZoom(z => Math.min(3, z + 0.1))
+          break
+        case '-':
+        case '_':
+          e.preventDefault()
+          setTooltipZoom(z => Math.max(0.5, z - 0.1))
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          nextTooltipImage()
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          prevTooltipImage()
+          break
+        case 'Escape':
+          e.preventDefault()
+          handleTooltipClose()
+          break
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [tooltipEvent, tooltipImages.length, tooltipPlaying])
+
   const formatTimestamp = (timestamp) => {
     if (timestamp == null) return '—'
     const ts = typeof timestamp === 'string' && /^\d+$/.test(timestamp)
@@ -547,13 +676,136 @@ export function GeographicMap() {
                           // Hover thumbnails disabled for now to reduce extra API calls
                         }}
                       >
-                        <Tooltip direction="top" offset={[0, -10]} opacity={1} sticky={false} permanent={false}>
-                          <div className="bg-background border rounded shadow p-1">
-                            {(() => {
-                              return (
-                                <div className="w-[150px] h-[100px] grid place-items-center text-xs text-muted-foreground">Event</div>
-                              )
-                            })()}
+                        <Tooltip
+                          direction="top"
+                          offset={[0, -10]}
+                          opacity={1}
+                          sticky={false}
+                          permanent={false}
+                          onOpen={() => handleTooltipOpen(event)}
+                          onClose={() => handleTooltipClose()}
+                        >
+                          <div
+                            className="bg-background border rounded shadow p-2 w-[300px] h-[250px] relative overflow-hidden"
+                            role="tooltip"
+                            aria-live="polite"
+                          >
+                            {tooltipImages.length === 0 ? (
+                              <div className="w-full h-full grid place-items-center text-xs text-muted-foreground">
+                                {tooltipLoading ? (
+                                  <div className="flex items-center space-x-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+                                    <span>Loading images…</span>
+                                  </div>
+                                ) : (
+                                  <>No images available for this event</>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                {/* Image Display */}
+                                <div className="relative w-full h-[180px] overflow-hidden rounded bg-black/10">
+                                  <img
+                                    src={tooltipImages[tooltipCurrentIndex]?.image_url}
+                                    alt={`Event snapshot ${tooltipCurrentIndex + 1} of ${tooltipImages.length} for ${event.channel_name}`}
+                                    className="w-full h-full object-contain transition-transform duration-200 ease-out"
+                                    style={{
+                                      transform: `scale(${tooltipZoom}) translate(${tooltipPan.x}px, ${tooltipPan.y}px)`
+                                    }}
+                                    onMouseDown={(e) => {
+                                      // Simple pan implementation
+                                      const startX = e.clientX - tooltipPan.x
+                                      const startY = e.clientY - tooltipPan.y
+                                      const handleMouseMove = (moveE) => {
+                                        setTooltipPan({
+                                          x: moveE.clientX - startX,
+                                          y: moveE.clientY - startY
+                                        })
+                                      }
+                                      const handleMouseUp = () => {
+                                        document.removeEventListener('mousemove', handleMouseMove)
+                                        document.removeEventListener('mouseup', handleMouseUp)
+                                      }
+                                      document.addEventListener('mousemove', handleMouseMove)
+                                      document.addEventListener('mouseup', handleMouseUp)
+                                    }}
+                                    onWheel={(e) => {
+                                      e.preventDefault()
+                                      const delta = e.deltaY > 0 ? -0.1 : 0.1
+                                      setTooltipZoom(prev => Math.max(0.5, Math.min(3, prev + delta)))
+                                    }}
+                                    aria-label={`Zoomable image, current zoom ${Math.round(tooltipZoom * 100)}%`}
+                                  />
+                                  {/* Metadata Overlay */}
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-1 text-xs" aria-live="polite">
+                                    <div aria-label={`Image ${tooltipCurrentIndex + 1} of ${tooltipImages.length}`}>
+                                      Image {tooltipCurrentIndex + 1} of {tooltipImages.length}
+                                    </div>
+                                    <div aria-label={`Camera: ${event.channel_name}`}>{event.channel_name}</div>
+                                    <div aria-label={`Timestamp: ${formatTimestamp(tooltipImages[tooltipCurrentIndex]?.timestamp || event.start_time)}`}>
+                                      {formatTimestamp(tooltipImages[tooltipCurrentIndex]?.timestamp || event.start_time)}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Controls */}
+                                <div className="flex items-center justify-between mt-2">
+                                  <div className="flex items-center space-x-1" role="group" aria-label="Image navigation controls">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={prevTooltipImage}
+                                      className="h-6 w-6 p-0"
+                                      aria-label="Previous image"
+                                    >
+                                      ‹
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={toggleTooltipPlayPause}
+                                      className="h-6 w-6 p-0"
+                                      aria-label={tooltipPlaying ? "Pause slideshow" : "Play slideshow"}
+                                    >
+                                      {tooltipPlaying ? '⏸' : '▶'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={nextTooltipImage}
+                                      className="h-6 w-6 p-0"
+                                      aria-label="Next image"
+                                    >
+                                      ›
+                                    </Button>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <label htmlFor="speed-select" className="text-xs sr-only">Slideshow speed</label>
+                                    <select
+                                      id="speed-select"
+                                      value={tooltipSpeed}
+                                      onChange={(e) => handleTooltipSpeedChange(Number(e.target.value))}
+                                      className="text-xs h-6 px-1 border rounded"
+                                      aria-label="Select slideshow speed"
+                                    >
+                                      <option value={1000}>1s</option>
+                                      <option value={2000}>2s</option>
+                                      <option value={3000}>3s</option>
+                                      <option value={5000}>5s</option>
+                                    </select>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => { setTooltipZoom(1); setTooltipPan({x:0,y:0}) }}
+                                      className="h-6 px-2"
+                                      aria-label="Reset zoom"
+                                    >
+                                      Reset
+                                    </Button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </Tooltip>
                         <Popup>

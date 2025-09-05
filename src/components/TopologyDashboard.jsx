@@ -1,18 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import { 
-  Network, 
-  Camera, 
-  Image, 
-  Tag, 
+import {
+  Network,
+  Camera,
+  Image,
+  Tag,
   Activity,
   Filter,
   RefreshCw,
   ZoomIn,
   ZoomOut,
   Maximize,
+  Minimize2,
   Settings,
-  Info
+  Info,
+  Search,
+  Download,
+  Layers,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,7 +57,17 @@ export function TopologyDashboard() {
   const [graphWidth, setGraphWidth] = useState(800)
   const [graphHeight, setGraphHeight] = useState(600)
   const [fullPage, setFullPage] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [tooltip, setTooltip] = useState(null)
+  const [layers, setLayers] = useState({
+    nodes: true,
+    edges: true,
+    labels: true,
+    images: true
+  })
+  const [hoveredNode, setHoveredNode] = useState(null)
   const graphRef = useRef()
+  const tooltipRef = useRef()
 
   const fetchGraphData = async () => {
     try {
@@ -160,9 +176,58 @@ export function TopologyDashboard() {
     }
   }
 
+  const handleNodeHover = (node) => {
+    setHoveredNode(node)
+    if (node) {
+      setTooltip({
+        x: node.x,
+        y: node.y,
+        content: (
+          <div>
+            <div className="font-semibold">{node.name}</div>
+            <div className="text-sm text-gray-600">Type: {node.type}</div>
+            {node.properties && Object.entries(node.properties).slice(0, 3).map(([key, value]) => (
+              <div key={key} className="text-sm">{key}: {String(value)}</div>
+            ))}
+          </div>
+        )
+      })
+    } else {
+      setTooltip(null)
+    }
+  }
+
+  const handleExport = (format) => {
+    if (!graphRef.current) return
+
+    const canvas = graphRef.current.canvas
+    if (!canvas) return
+
+    if (format === 'png') {
+      const link = document.createElement('a')
+      link.download = `topology-${new Date().toISOString().split('T')[0]}.png`
+      link.href = canvas.toDataURL()
+      link.click()
+    } else if (format === 'svg') {
+      // For SVG export, we'd need to implement SVG generation
+      // This is a placeholder for future implementation
+      console.log('SVG export not yet implemented')
+    }
+  }
+
+  const filteredNodes = graphData.nodes.filter(node =>
+    node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    node.type.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const filteredLinks = graphData.links.filter(link =>
+    filteredNodes.some(node => node.id === link.source) &&
+    filteredNodes.some(node => node.id === link.target)
+  )
+
   const getNodeStats = () => {
     const stats = {}
-    graphData.nodes.forEach(node => {
+    filteredNodes.forEach(node => {
       stats[node.type] = (stats[node.type] || 0) + 1
     })
     return stats
@@ -170,7 +235,7 @@ export function TopologyDashboard() {
 
   const getEdgeStats = () => {
     const stats = {}
-    graphData.links.forEach(link => {
+    filteredLinks.forEach(link => {
       stats[link.type] = (stats[link.type] || 0) + 1
     })
     return stats
@@ -207,12 +272,12 @@ export function TopologyDashboard() {
         <div className="flex items-center space-x-4">
           <Badge variant="outline" className="flex items-center space-x-1">
             <Network className="w-3 h-3" />
-            <span>{graphData.nodes.length} nodes</span>
+            <span>{filteredNodes.length} nodes</span>
           </Badge>
 
           <Badge variant="outline" className="flex items-center space-x-1">
             <Activity className="w-3 h-3" />
-            <span>{graphData.links.length} edges</span>
+            <span>{filteredLinks.length} edges</span>
           </Badge>
 
           <Button onClick={fetchGraphData} variant="outline" size="sm">
@@ -237,6 +302,18 @@ export function TopologyDashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Search Bar */}
+          <div className="topology-search-bar mb-4">
+            <Search className="search-icon w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search nodes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Depth Level</label>
@@ -287,17 +364,52 @@ export function TopologyDashboard() {
             <div>
               <label className="text-sm font-medium mb-2 block">Graph Controls</label>
               <div className="flex space-x-2">
-                <Button onClick={handleZoomIn} variant="outline" size="sm">
+                <Button onClick={handleZoomIn} variant="outline" size="sm" title="Zoom In">
                   <ZoomIn className="w-4 h-4" />
                 </Button>
-                <Button onClick={handleZoomOut} variant="outline" size="sm">
+                <Button onClick={handleZoomOut} variant="outline" size="sm" title="Zoom Out">
                   <ZoomOut className="w-4 h-4" />
                 </Button>
-                <Button onClick={handleFitToView} variant="outline" size="sm">
+                <Button onClick={handleFitToView} variant="outline" size="sm" title="Fit to View">
                   <Maximize className="w-4 h-4" />
                 </Button>
               </div>
             </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Layers</label>
+              <div className="layer-controls">
+                <button
+                  className={`layer-toggle ${layers.nodes ? 'active' : ''}`}
+                  onClick={() => setLayers(prev => ({ ...prev, nodes: !prev.nodes }))}
+                >
+                  {layers.nodes ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  Nodes
+                </button>
+                <button
+                  className={`layer-toggle ${layers.edges ? 'active' : ''}`}
+                  onClick={() => setLayers(prev => ({ ...prev, edges: !prev.edges }))}
+                >
+                  {layers.edges ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  Edges
+                </button>
+                <button
+                  className={`layer-toggle ${layers.labels ? 'active' : ''}`}
+                  onClick={() => setLayers(prev => ({ ...prev, labels: !prev.labels }))}
+                >
+                  {layers.labels ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  Labels
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Export Controls */}
+          <div className="export-controls">
+            <Button onClick={() => handleExport('png')} variant="outline" size="sm">
+              <Download className="w-4 h-4 mr-2" />
+              Export PNG
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -327,34 +439,38 @@ export function TopologyDashboard() {
                 </div>
               ) : null}
               
-              <div className="h-96 rounded-lg overflow-hidden border">
+              <div className="h-96 rounded-lg overflow-hidden border relative">
                 <ForceGraph2D
                   ref={graphRef}
-                  graphData={graphData}
+                  graphData={{ nodes: filteredNodes, links: filteredLinks }}
                   width={graphWidth}
                   height={graphHeight}
-                  nodeLabel={showLabels ? 'name' : ''}
-                  nodeColor="color"
+                  nodeLabel={showLabels && layers.labels ? 'name' : ''}
+                  nodeColor={layers.nodes ? "color" : "rgba(0,0,0,0)"}
                   nodeVal="size"
-                  linkColor="color"
-                  linkWidth="width"
-                  linkDirectionalArrowLength={3}
+                  linkColor={layers.edges ? "color" : "rgba(0,0,0,0)"}
+                  linkWidth={layers.edges ? "width" : 0}
+                  linkDirectionalArrowLength={layers.edges ? 3 : 0}
                   linkDirectionalArrowRelPos={1}
                   minMap={true}
+                  minMapClass="graph-minimap"
                   onNodeClick={handleNodeClick}
+                  onNodeHover={handleNodeHover}
                   nodeCanvasObject={(node, ctx, globalScale) => {
+                    if (!layers.nodes) return
+
                     const label = node.name
                     const fontSize = 12/globalScale
                     ctx.font = `${fontSize}px Sans-Serif`
-                    
+
                     // Draw node
                     ctx.fillStyle = node.color
                     ctx.beginPath()
                     ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI, false)
                     ctx.fill()
-                    
+
                     // Draw label if enabled
-                    if (showLabels && globalScale > 0.5) {
+                    if (showLabels && layers.labels && globalScale > 0.5) {
                       ctx.textAlign = 'center'
                       ctx.textBaseline = 'middle'
                       ctx.fillStyle = '#000'
@@ -362,6 +478,21 @@ export function TopologyDashboard() {
                     }
                   }}
                 />
+
+                {/* Tooltip */}
+                {tooltip && (
+                  <div
+                    ref={tooltipRef}
+                    className="graph-tooltip"
+                    style={{
+                      left: tooltip.x + 10,
+                      top: tooltip.y - 10,
+                      transform: 'translate(-50%, -100%)'
+                    }}
+                  >
+                    {tooltip.content}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

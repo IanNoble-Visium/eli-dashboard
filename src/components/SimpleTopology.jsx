@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, memo } from 'react'
+import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import {
   Network,
@@ -10,7 +10,9 @@ import {
   ZoomOut,
   Maximize,
   Minimize2,
-  Settings
+  Settings,
+  EyeOff,
+  RotateCcw
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -50,6 +52,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api
 function SimpleTopology() {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] })
   const [selectedNode, setSelectedNode] = useState(null)
+  const [selectedEdge, setSelectedEdge] = useState(null)
   const [showImages, setShowImages] = useState(true)
   const [graphWidth, setGraphWidth] = useState(800)
   const [graphHeight, setGraphHeight] = useState(600)
@@ -58,10 +61,29 @@ function SimpleTopology() {
   const [error, setError] = useState(null)
   const [fullPage, setFullPage] = useState(false)
   const [visibleNodeTypes, setVisibleNodeTypes] = useState(Object.keys(nodeConfig).filter(key => key !== 'default'))
+  const [enableEdgeClick, setEnableEdgeClick] = useState(true)
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const { authFetch, isAuthenticated } = useAuth()
   const graphRef = useRef()
   const imageCacheRef = useRef(new Map())
+  // Smooth visibility animation state
+  const fadeAnimatingRef = useRef(false)
+  const fadeEndRef = useRef(0)
+  const startFadeAnimation = useCallback((ms = 400) => {
+    fadeEndRef.current = Date.now() + ms
+    if (fadeAnimatingRef.current) return
+    fadeAnimatingRef.current = true
+    const loop = () => {
+      if (!graphRef.current) { fadeAnimatingRef.current = false; return }
+      graphRef.current.refresh()
+      if (Date.now() < fadeEndRef.current) {
+        requestAnimationFrame(loop)
+      } else {
+        fadeAnimatingRef.current = false
+      }
+    }
+    requestAnimationFrame(loop)
+  }, [])
 
   const colorForType = (type) => nodeConfig[type]?.color || nodeConfig.default.color
   const sizeForType = (type) => nodeConfig[type]?.size || nodeConfig.default.size
@@ -127,14 +149,37 @@ function SimpleTopology() {
     }
   }, [showImages])
 
+  // Track which types toggled for fade-in/out
+  const prevVisibleRef = useRef(visibleNodeTypes)
+  const fadeOnTypesRef = useRef(new Set())
+  const fadeOffTypesRef = useRef(new Set())
+  // Also refresh when visibility filters change; animate a short fade
+  useEffect(() => {
+    const prev = new Set(prevVisibleRef.current)
+    const curr = new Set(visibleNodeTypes)
+    const turnedOn = new Set([...curr].filter(t => !prev.has(t)))
+    const turnedOff = new Set([...prev].filter(t => !curr.has(t)))
+    fadeOnTypesRef.current = turnedOn
+    fadeOffTypesRef.current = turnedOff
+    prevVisibleRef.current = visibleNodeTypes
+    startFadeAnimation(300)
+  }, [visibleNodeTypes, startFadeAnimation])
+
 
 
   const handleNodeClick = (node) => {
     setSelectedNode(node)
+    setSelectedEdge(null) // Clear edge selection when node is clicked
     if (graphRef.current) {
       graphRef.current.centerAt(node.x, node.y, 1000)
       graphRef.current.zoom(2, 1000)
     }
+  }
+
+  const handleEdgeClick = (edge) => {
+    if (!enableEdgeClick) return
+    setSelectedEdge(edge)
+    setSelectedNode(null) // Clear node selection when edge is clicked
   }
 
   const handleZoomIn = () => {
@@ -159,6 +204,7 @@ function SimpleTopology() {
 
 
 
+  // Visibility helpers: keep full simulation data, only hide visually
   const filteredNodes = useMemo(() =>
     graphData.nodes.filter(node => visibleNodeTypes.includes(node.type)),
     [graphData.nodes, visibleNodeTypes]
@@ -174,10 +220,24 @@ function SimpleTopology() {
     [graphData.links, nodeIds]
   )
 
-  const filteredGraphData = useMemo(() => ({
-    nodes: filteredNodes,
-    links: filteredLinks
-  }), [filteredNodes, filteredLinks])
+  // Keep a quick lookup map of all nodes by id for visibility checks
+  const nodeById = useMemo(() => {
+    const m = new Map()
+    graphData.nodes.forEach(n => m.set(n.id, n))
+    return m
+  }, [graphData.nodes])
+
+  const isNodeVisible = useCallback((nodeOrId) => {
+    const node = typeof nodeOrId === 'object' ? nodeOrId : nodeById.get(nodeOrId)
+    return !!node && visibleNodeTypes.includes(node.type)
+  }, [nodeById, visibleNodeTypes])
+
+  const isLinkVisible = useCallback((link) => {
+    const src = link?.source && (link.source.id ?? link.source)
+    const tgt = link?.target && (link.target.id ?? link.target)
+    return isNodeVisible(src) && isNodeVisible(tgt)
+  }, [isNodeVisible])
+
 
   const nodeStats = useMemo(() => {
     const stats = {}
@@ -244,26 +304,53 @@ function SimpleTopology() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Display Options</label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={showImages}
-                  onCheckedChange={setShowImages}
-                />
-                <span className="text-sm">Show Images</span>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={showImages}
+                    onCheckedChange={setShowImages}
+                  />
+                  <span className="text-sm">Show Images</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={enableEdgeClick}
+                    onCheckedChange={setEnableEdgeClick}
+                  />
+                  <span className="text-sm">Enable Edge Click</span>
+                </div>
               </div>
             </div>
 
             <div>
               <label className="text-sm font-medium mb-2 block">Graph Controls</label>
-              <div className="flex space-x-2">
-                <Button onClick={handleZoomIn} variant="outline" size="sm">
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleZoomIn} variant="outline" size="sm" aria-label="Zoom in">
                   <ZoomIn className="w-4 h-4" />
                 </Button>
-                <Button onClick={handleZoomOut} variant="outline" size="sm">
+                <Button onClick={handleZoomOut} variant="outline" size="sm" aria-label="Zoom out">
                   <ZoomOut className="w-4 h-4" />
                 </Button>
-                <Button onClick={handleFitToView} variant="outline" size="sm">
+                <Button onClick={handleFitToView} variant="outline" size="sm" aria-label="Fit to view">
                   <Maximize className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => setVisibleNodeTypes([])}
+                  variant="outline"
+                  size="sm"
+                  aria-label="Hide all node types"
+                >
+                  <EyeOff className="w-4 h-4 mr-1" />
+                  All Off
+                </Button>
+                <Button
+                  onClick={() => { try { graphRef.current?.d3ReheatSimulation?.(); graphRef.current?.zoomToFit?.(400) } catch(_) {} }}
+                  variant="outline"
+                  size="sm"
+                  aria-label="Reset layout"
+                >
+                  <RotateCcw className="w-4 h-4 mr-1" />
+                  Reset Layout
                 </Button>
               </div>
             </div>
@@ -306,7 +393,7 @@ function SimpleTopology() {
                 <span>Network Graph - ELI Demo System</span>
               </CardTitle>
               <CardDescription>
-                Click and drag to explore. Click nodes for details. This shows the actual structure of your Lima camera system.
+                Click and drag to explore. Click nodes or edges for details. This shows the actual structure of your Lima camera system.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -322,32 +409,73 @@ function SimpleTopology() {
                 <ForceGraph2D
                   key="topology-graph-stable"
                   ref={graphRef}
-                  graphData={filteredGraphData}
+                  // IMPORTANT: keep full data so simulation/layout persists
+                  graphData={graphData}
                   width={graphWidth}
                   height={graphHeight}
                   nodeLabel={''}
-                  nodeColor="color"
-                  nodeVal="size"
-                  linkColor="color"
-                  linkWidth="width"
-                  linkDirectionalArrowLength={3}
+                  nodeColor={() => undefined}
+                  nodeVal={(node) => node.size}
+                  linkColor={(link) => {
+                    const base = (selectedEdge && link === selectedEdge) ? '#ff6b35' : (link.color || '#999')
+                    const toRgba = (hex, a) => {
+                      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
+                      return `rgba(${r}, ${g}, ${b}, ${a})`
+                    }
+                    if (isLinkVisible(link)) {
+                      const t = Math.max(0, Math.min(1, (fadeEndRef.current - Date.now()) / 300))
+                      const alpha = 1 - t * 0.7
+                      return toRgba(base, alpha)
+                    }
+                    // If not visible, check if either end is fading off
+                    const src = link?.source && (link.source.id ?? link.source)
+                    const tgt = link?.target && (link.target.id ?? link.target)
+                    const srcType = nodeById.get(src)?.type
+                    const tgtType = nodeById.get(tgt)?.type
+                    if ((fadeOffTypesRef.current.has(srcType) || fadeOffTypesRef.current.has(tgtType)) && (Date.now() < fadeEndRef.current)) {
+                      const t = Math.max(0, Math.min(1, (fadeEndRef.current - Date.now()) / 300))
+                      return toRgba(base, t)
+                    }
+                    return 'rgba(0,0,0,0)'
+                  }}
+                  linkWidth={(link) => {
+                    const w = link.width || 1
+                    if (isLinkVisible(link)) return (selectedEdge && link === selectedEdge) ? w * 2 : w
+                    // if fading out due to type toggle, keep thin width during fade
+                    const src = link?.source && (link.source.id ?? link.source)
+                    const tgt = link?.target && (link.target.id ?? link.target)
+                    const srcType = nodeById.get(src)?.type
+                    const tgtType = nodeById.get(tgt)?.type
+                    const fading = (fadeOffTypesRef.current.has(srcType) || fadeOffTypesRef.current.has(tgtType)) && (Date.now() < fadeEndRef.current)
+                    return fading ? Math.max(0.5, w * 0.8) : 0
+                  }}
+                  linkDirectionalArrowLength={(link) => (isLinkVisible(link) ? 3 : 0)}
                   linkDirectionalArrowRelPos={1}
                   minMap={true}
                   onNodeClick={handleNodeClick}
+                  onLinkClick={handleEdgeClick}
                   // Replace default node drawing so we control circles vs images
                   nodeCanvasObjectMode={() => 'replace'}
                   // Ensure pointer interactions match the visual (circular area)
                   nodePointerAreaPaint={(node, color, ctx) => {
+                    if (!isNodeVisible(node)) return
                     ctx.fillStyle = color
                     ctx.beginPath()
                     ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI, false)
                     ctx.fill()
                   }}
                   nodeCanvasObject={(node, ctx) => {
+                    if (!isNodeVisible(node)) return
                     const radius = node.size
                     const isImageNode = node.type === 'Image'
                     const url = isImageNode ? (node.properties?.image_url || node.properties?.url || node.properties?.path) : null
                     const shouldDrawImage = Boolean(showImages && isImageNode && url)
+                    const t = Math.max(0, Math.min(1, (fadeEndRef.current - Date.now()) / 300))
+                    const alpha = 1 - t * 0.7
+                    const scaleBump = 1 - t * 0.1 // subtle scale from 0.9 -> 1
+
+                    ctx.save()
+                    ctx.globalAlpha = alpha
 
                     if (shouldDrawImage) {
                       let img = imageCacheRef.current.get(url)
@@ -369,16 +497,14 @@ function SimpleTopology() {
                       }
 
                       if (img && img !== 'error' && img.complete && img.naturalWidth > 0) {
-                        const size = Math.max(12, radius * 2)
+                        const size = Math.max(12, radius * 2) * scaleBump
                         try {
                           // Draw as a circular clipped image
-                          ctx.save()
                           ctx.beginPath()
                           ctx.arc(node.x, node.y, size / 2, 0, 2 * Math.PI, false)
                           ctx.closePath()
                           ctx.clip()
                           ctx.drawImage(img, node.x - size / 2, node.y - size / 2, size, size)
-                          ctx.restore()
                           // Optional subtle ring
                           ctx.strokeStyle = '#ffffff'
                           ctx.lineWidth = 1
@@ -386,22 +512,25 @@ function SimpleTopology() {
                           ctx.arc(node.x, node.y, size / 2, 0, 2 * Math.PI)
                           ctx.stroke()
                         } catch (_) {}
+                        ctx.restore()
                         return
                       }
 
                       // Placeholder while image loads or on error
                       ctx.fillStyle = '#e5e7eb'
                       ctx.beginPath()
-                      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false)
+                      ctx.arc(node.x, node.y, radius * scaleBump, 0, 2 * Math.PI, false)
                       ctx.fill()
+                      ctx.restore()
                       return
                     }
 
                     // Default: draw colored circle
                     ctx.fillStyle = node.color
                     ctx.beginPath()
-                    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false)
+                    ctx.arc(node.x, node.y, radius * scaleBump, 0, 2 * Math.PI, false)
                     ctx.fill()
+                    ctx.restore()
                   }}
                 />
               </div>
@@ -446,6 +575,83 @@ function SimpleTopology() {
                 <div className="text-center text-muted-foreground py-8">
                   <Network className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>Select a node to view details</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Selected Edge Details */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Edge Details</CardTitle>
+              <CardDescription>
+                {selectedEdge ? 'Selected edge information' : 'Click on an edge to view details'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {selectedEdge ? (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-lg">{selectedEdge.type}</h3>
+                    <Badge variant="outline">{selectedEdge.type}</Badge>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Connection:</h4>
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Source:</span>
+                        <span className="font-mono text-xs">
+                          {typeof selectedEdge.source === 'object' ? selectedEdge.source.name : selectedEdge.source}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Target:</span>
+                        <span className="font-mono text-xs">
+                          {typeof selectedEdge.target === 'object' ? selectedEdge.target.name : selectedEdge.target}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Direction:</span>
+                        <span className="font-mono text-xs">
+                          {typeof selectedEdge.source === 'object' ? selectedEdge.source.name : selectedEdge.source} → {typeof selectedEdge.target === 'object' ? selectedEdge.target.name : selectedEdge.target}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Directionality:</span>
+                        <span className="font-mono text-xs">Directed</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Properties:</h4>
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Type:</span>
+                        <span className="font-mono text-xs">{selectedEdge.type}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Strength:</span>
+                        <span className="font-mono text-xs">{selectedEdge.width || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Color:</span>
+                        <span className="font-mono text-xs">{selectedEdge.color}</span>
+                      </div>
+                      {selectedEdge.label && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Label:</span>
+                          <span className="font-mono text-xs">{selectedEdge.label}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Select an edge to view details</p>
                 </div>
               )}
             </CardContent>
