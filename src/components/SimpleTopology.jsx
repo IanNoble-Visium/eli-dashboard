@@ -870,7 +870,7 @@ function SimpleTopology() {
              </CardDescription>
            </CardHeader>
             <CardContent>
-              <div className="h-96 rounded-lg overflow-hidden border relative">
+              <div className={`${fullPage ? 'h-[calc(100vh-200px)]' : 'h-96'} rounded-lg overflow-hidden border relative`}>
                 {loading && (
                   <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
                     <div className="text-center">

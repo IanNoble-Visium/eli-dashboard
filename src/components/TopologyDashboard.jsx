@@ -453,7 +453,7 @@ export function TopologyDashboard() {
                 </div>
               ) : null}
               
-              <div className="h-80 sm:h-96 rounded-lg overflow-hidden border relative">
+              <div className={`${fullPage ? 'h-[calc(100vh-200px)]' : 'h-80 sm:h-96'} rounded-lg overflow-hidden border relative`}>
                 <ForceGraph2D
                   ref={graphRef}
                   graphData={{ nodes: filteredNodes, links: filteredLinks }}

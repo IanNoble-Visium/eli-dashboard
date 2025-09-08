@@ -94,7 +94,8 @@ The dashboard features a robust authentication system with JWT tokens and sessio
 - Professional legend and controls
 
 ### Topology
-- Interactive force-directed graph
+- Interactive network graph with a new **Layout Selector**
+- Five layout modes: **Force-directed**, **Hierarchical**, **Grid**, **Radial**, **Circular**
 - Camera → Events → Snapshots → Tags relationships
 - Node details and statistics
 - **Edge click functionality** with dedicated Edge Details panel
@@ -102,6 +103,23 @@ The dashboard features a robust authentication system with JWT tokens and sessio
 - **Edge properties display** (relationship type, strength, directionality, metadata)
 - Interactive controls and filtering
 - Toggle edge click feature on/off in settings
+
+#### Topology Layout Selector (New)
+- Located in the Graph Controls panel on the Topology screen
+- Choose from 5 layouts:
+  - Force-directed: physics-based layout that settles organically
+  - Hierarchical: top→down layered view (uses react-force-graph dagMode="td")
+  - Grid: nodes placed in evenly spaced rows/columns (uses fixed fx/fy positions)
+  - Radial: concentric rings grouped by node type (uses fixed fx/fy positions)
+  - Circular: all nodes around a circle (uses fixed fx/fy positions)
+- Layout-specific spacing controls:
+  - Hierarchical: Layer gap slider (dagLevelDistance)
+  - Grid: Grid spacing slider
+  - Radial: Ring spacing slider
+  - Circular: Radius slider
+- Reset Layout re-applies the active layout and fits view
+
+- Layout controls live in the Graph Controls panel with layout-specific spacing options
 
 ### Data Management
 - Comprehensive table view with events and snapshots
@@ -304,7 +322,7 @@ All dashboard components now use the centralized authentication system with enha
 - `TimeRangeSelector` - Streamlined component with histogram, zoom slider, and event count callbacks
 - `TableView` - Data table with events and snapshots
 - `GeographicMap` - Interactive map with event locations
-- `SimpleTopology` - Network topology visualization
+- `SimpleTopology` - Network topology visualization with layout selector (force, hierarchical, grid, radial, circular)
 - `WatchlistBreakdownCard` - Watchlist analysis
 
 #### Component Communication Patterns
@@ -387,7 +405,7 @@ All dashboard components now use the centralized authentication system with enha
 
 ✅ **Executive Dashboard** - Optimized layout with dynamic event counting and unified time range controls
 ✅ **Geographic Map** - Interactive map with terrain features and hover previews
-✅ **Topology** - Force-directed graph visualization with interactive edge selection
+✅ **Topology** - Multi-layout network visualization (force, hierarchical, grid, radial, circular) with interactive edge selection
 ✅ **Data Management** - Comprehensive table with CRUD operations
 ✅ **Global Search** - Advanced search across all data types
 ✅ **Real-time Updates** - Live monitoring with synchronized data across all components

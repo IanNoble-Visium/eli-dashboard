@@ -196,13 +196,15 @@ function TableView() {
       if (eventsResponse.ok) {
         const eventsData = await eventsResponse.json()
         setEvents(eventsData.events || [])
-        setTotalEvents(eventsData.total || eventsData.totalCount || eventsData.events?.length || 0)
+        // Use server-provided pagination metadata for accurate totals
+        setTotalEvents(eventsData.pagination?.total ?? eventsData.total ?? eventsData.totalCount ?? eventsData.events?.length ?? 0)
       }
 
       if (snapshotsResponse.ok) {
         const snapshotsData = await snapshotsResponse.json()
         setSnapshots(snapshotsData.snapshots || [])
-        setTotalSnapshots(snapshotsData.total || snapshotsData.totalCount || snapshotsData.snapshots?.length || 0)
+        // Use server-provided pagination metadata for accurate totals
+        setTotalSnapshots(snapshotsData.pagination?.total ?? snapshotsData.total ?? snapshotsData.totalCount ?? snapshotsData.snapshots?.length ?? 0)
       }
 
     } catch (err) {
@@ -250,12 +252,13 @@ function TableView() {
     return matchesSearch
   })
 
-  // Pagination logic
+  // Pagination logic (server-side pagination)
   const currentData = activeTab === 'events' ? filteredEvents : filteredSnapshots
   const totalCount = activeTab === 'events' ? totalEvents : totalSnapshots
   const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedData = currentData.slice(startIndex, startIndex + itemsPerPage)
+  // Server already returns a single page of results, so do not slice again
+  const paginatedData = currentData
 
   const formatTimestamp = (timestamp) => {
     if (timestamp == null) return '—'

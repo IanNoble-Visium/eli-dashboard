@@ -617,7 +617,7 @@ export function GeographicMap() {
               })()}
 
               {!loading && !error && (
-                <div className="h-96 rounded-lg overflow-hidden">
+                <div className={`${fullPage ? 'h-[calc(100vh-200px)]' : 'h-96'} rounded-lg overflow-hidden`}>
                   {(() => {
                     console.log('🗺️ Rendering MapContainer with:', { mapCenter, mapZoom, eventsCount: events.length })
                     return (
