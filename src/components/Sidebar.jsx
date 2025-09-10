@@ -10,7 +10,8 @@ import {
   ChevronRight,
   Activity,
   Eye,
-  Database
+  Database,
+  Cpu
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'Topology', href: '/topology', icon: Network },
   { name: 'Data Table', href: '/table', icon: Table },
   { name: 'Search', href: '/search', icon: Search },
+  { name: 'AI Analytics', href: '/ai', icon: Cpu },
 ]
 
 export function Sidebar({ open, setOpen }) {

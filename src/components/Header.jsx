@@ -63,8 +63,8 @@ export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode, 
           </Button>
 
           <img
-            src="/images/VisiumAnalytics-logo.png"
-            alt="Visium Analytics Logo"
+            src="/images/eli-logo.jpg"
+            alt="ELI Logo"
             className="h-8 w-auto mr-4"
           />
 

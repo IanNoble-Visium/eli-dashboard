@@ -2,6 +2,21 @@
 
 A comprehensive dashboard application for the ELI demo that visualizes and manages data captured from the IREX system. Built with React (Vite) frontend and Node.js API handlers that work both as local Express server for development and Vercel serverless functions for production, integrating with PostgreSQL and Neo4j.
 
+## 🧠 New: AI Analytics
+
+A dedicated page at `/ai` adds three intelligent analysis sections powered by Google Cloud Vertex AI (Gemini models):
+- Predictive Analytics: Forecasts event volume, graph flow, and optional Cloudflare traffic for the next 2–4 hours with confidence bands
+- Behavioral Analysis: Summarizes baselines and highlights deviations per channel/entity
+- Anomaly Detection: Computes robust z-scores on recent activity and surfaces top outliers
+
+Endpoints:
+- `GET /api/ai/predictive` (🔒) — aggregates Postgres + Neo4j + optional Cloudflare series, returns forecasts
+- `GET /api/ai/behavior` (🔒) — computes baselines and asks Vertex to classify deviations
+- `GET /api/ai/anomaly` (🔒) — returns anomaly scores and outliers for minute-level activity
+
+Navigation:
+- A new “AI Analytics” item is available in the sidebar and routes to `/ai`.
+
 ## 🔐 Authentication & Security
 
 The dashboard features a robust authentication system with JWT tokens and session management:
@@ -192,6 +207,18 @@ CORS_ORIGINS=https://your-app.vercel.app,http://localhost:5173
 # Frontend API Base
 VITE_API_BASE_URL=/api
 
+# AI/ML (Vertex AI)
+GOOGLE_PROJECT_ID=your-gcp-project-id            # e.g., eli-demo-471705
+GOOGLE_LOCATION=us-central1                      # recommended region for Gemini
+# Preferred: store the full service account JSON in ONE variable
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+# Optional fallback if no service account is provided (not recommended in prod)
+# GOOGLE_API_KEY=...
+
+# Optional: Cloudflare Analytics for traffic series in Predictive Analytics
+CLOUDFLARE_API_TOKEN=...                         # API Token with Analytics.read
+CLOUDFLARE_ACCOUNT_ID=...
+
 # Optional: Cloudinary for image features
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
@@ -201,7 +228,9 @@ CLOUDINARY_API_SECRET=your-api-secret
 PORT=5001
 ```
 
-**⚠️ Important**: Missing environment variables will cause API endpoints to return HTML instead of JSON responses.
+Security notes:
+- Do NOT commit key files; keep service account JSON only in Vercel env vars.
+- If you must use files locally, name them to match .gitignore patterns (e.g., *service-account*.json).
 
 #### Frontend (Environment Variables)
 - Development (local):
@@ -237,6 +266,11 @@ eli-dashboard/
 - `POST /api/login` - User authentication (password-based)
 - `GET /api/login` - Verify current authentication status
 - `DELETE /api/login` - Logout and clear session
+
+### AI Endpoints (🔒 Protected)
+- `GET /api/ai/predictive` — Predictive Analytics; includes Postgres/Neo4j/Cloudflare series and Vertex-generated forecasts
+- `GET /api/ai/behavior` — Behavioral Analysis; baselines + deviation hints via Vertex
+- `GET /api/ai/anomaly` — Anomaly Detection; robust z-scores and top outliers
 
 ### Dashboard Endpoints (🔒 Protected)
 - `GET /api/dashboard/health` - System health check (public)
@@ -337,6 +371,11 @@ All dashboard components now use the centralized authentication system with enha
 - **Lucide React**: Modern icon library
 - **Recharts**: Data visualization library
 - **Leaflet**: Interactive maps
+
+### AI/ML Dependencies
+- **@google-cloud/aiplatform**: Vertex AI SDK (installed)
+- **@google-cloud/vertexai**: Server-side Gemini client (installed)
+- **graphql-request**: Cloudflare Analytics GraphQL (installed)
 
 ## 🔒 Security
 

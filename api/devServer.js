@@ -28,6 +28,11 @@ import graph from './dashboard/graph.js'
 import analytics from './dashboard/analytics.js'
 import identities from './dashboard/identities.js'
 
+// AI Analytics
+import aiPredictive from './ai/predictive.js'
+import aiBehavior from './ai/behavior.js'
+import aiAnomaly from './ai/anomaly.js'
+
 // Events
 import eventsIndex from './events/index.js'
 import eventById from './events/[id].js'
@@ -88,6 +93,11 @@ app.all('/api/dashboard/timeline', timeline)
 app.all('/api/dashboard/graph', graph)
 app.all('/api/dashboard/analytics', analytics)
 app.all('/api/dashboard/identities', identities)
+
+// AI routes
+app.all('/api/ai/predictive', aiPredictive)
+app.all('/api/ai/behavior', aiBehavior)
+app.all('/api/ai/anomaly', aiAnomaly)
 
 // Events routes
 app.all('/api/events', eventsIndex)

@@ -7,6 +7,7 @@ import GeographicMap from '@/components/GeographicMap'
 import SimpleTopology from '@/components/SimpleTopology'
 import TableView from '@/components/TableView'
 import SearchView from '@/components/SearchView'
+import AiAnalytics from '@/components/AiAnalytics'
 import Login from '@/components/Login'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { useAuth } from '@/context/AuthContext'
@@ -68,6 +69,7 @@ function App() {
               <Route path="/topology" element={<SimpleTopology />} />
               <Route path="/table" element={<ErrorBoundary><TableView /></ErrorBoundary>} />
               <Route path="/search" element={<SearchView />} />
+              <Route path="/ai" element={<AiAnalytics />} />
             </Routes>
           </main>
         </div>

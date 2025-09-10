@@ -111,3 +111,23 @@ jspm_packages/
 frontend/node_modules/*
 node_modules/
 backup.bat
+
+# Google Cloud credentials and service account keys (never commit)
+*.json.key
+*.p12
+*.pfx
+*.pem
+*.cer
+*.crt
+*service-account*.json
+*service_account*.json
+*gcloud*.json
+credentials.json
+**/credentials/*.json
+**/secrets/*.json
+# Common local files for ADC or manual creds
+*.gcp.json
+google-credentials.json
+.gcloud/
+.key/
+.secret/
