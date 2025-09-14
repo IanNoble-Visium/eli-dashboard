@@ -35,6 +35,7 @@ import aiAnomaly from './ai/anomaly.js'
 import aiStream from './ai/stream.js'
 import aiProcessJob from './ai/process-job.js'
 import aiJobs from './ai/jobs.js'
+import aiInsightsFeed from './ai/insights-feed.js'
 
 // Events
 import eventsIndex from './events/index.js'
@@ -105,6 +106,7 @@ app.all('/api/ai/stream', aiStream)
 app.all('/api/ai/process-job', aiProcessJob)
 app.all('/api/ai/jobs', aiJobs)
 app.all('/api/ai/poll', (req, res) => import('./ai/poll.js').then(m => m.default(req, res)))
+app.all('/api/ai/insights-feed', aiInsightsFeed)
 
 // Events routes
 app.all('/api/events', eventsIndex)

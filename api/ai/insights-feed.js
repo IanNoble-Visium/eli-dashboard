@@ -14,8 +14,15 @@ export default withCors(withAuth(async function handler(req, res) {
                FROM ai_insights
                WHERE scope = $1 AND ts >= $2`
     const params = [scope, since]
-    if (scopeId) { sql += ' AND scope_id = $3'; params.push(scopeId) }
-    sql += ' ORDER BY ts DESC LIMIT $4'; params.push(limit)
+    let next = 2
+    if (scopeId) {
+      next += 1
+      sql += ` AND scope_id = $${next}`
+      params.push(scopeId)
+    }
+    next += 1
+    sql += ` ORDER BY ts DESC LIMIT $${next}`
+    params.push(limit)
 
     const rows = await query(sql, params).then(r => r.rows)
     return res.json({ status: 'ok', count: rows.length, data: rows })
