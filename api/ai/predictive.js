@@ -3,7 +3,6 @@ import { withAuth } from '../_lib/auth.js'
 import { query, toMillisAgo } from '../_lib/db.js'
 import { runCypher } from '../_lib/neo4j.js'
 import { forecastSeries } from '../_lib/vertex.js'
-import { fetchCloudflareAnalytics } from '../_lib/cloudflare.js'
 
 export default withCors(withAuth(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })
@@ -35,15 +34,10 @@ export default withCors(withAuth(async function handler(req, res) {
     const graphRes = await runCypher(cypher, { start: startTs, end: windowEnd })
     const flowSeries = graphRes.records.map(r => ({ t: new Date(r.get('ts')).toISOString(), y: Number(r.get('count')) }))
 
-    // 3) Cloudflare analytics (optional)
-    const cf = await fetchCloudflareAnalytics({ sinceISO: new Date(startTs).toISOString() })
-    const trafficSeries = (cf.data.series || []).map(s => ({ t: s.t, y: s.requests }))
-
-    // Forecast via Vertex
-    const [eventsFc, flowFc, trafficFc] = await Promise.all([
+    // Forecast via Vertex (traffic series removed; Cloudflare dependency dropped)
+    const [eventsFc, flowFc] = await Promise.all([
       forecastSeries({ series: eventSeries }),
       forecastSeries({ series: flowSeries }),
-      forecastSeries({ series: trafficSeries }),
     ])
 
     res.json({
@@ -52,14 +46,12 @@ export default withCors(withAuth(async function handler(req, res) {
       inputs: {
         eventSeries,
         flowSeries,
-        trafficSeries,
       },
       forecasts: {
         events: eventsFc.output?.forecast || [],
         flow: flowFc.output?.forecast || [],
-        traffic: trafficFc.output?.forecast || [],
       },
-      warnings: [eventsFc.error, flowFc.error, trafficFc.error].filter(Boolean),
+      warnings: [eventsFc.error, flowFc.error].filter(Boolean),
       timestamp: new Date().toISOString(),
     })
   } catch (e) {

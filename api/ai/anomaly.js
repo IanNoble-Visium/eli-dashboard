@@ -33,7 +33,24 @@ export default withCors(withAuth(async function handler(req, res) {
     const z = robustZScores(points.map(p => p.y))
     const scored = points.map((p, i) => ({ ...p, score: Math.abs(z[i]) }))
 
-    // Top outliers
+    // Persist recent top outliers to ai_anomalies for realtime streaming
+    const recent = scored.slice(-10)
+    const threshold = 3.0
+    const toSave = recent.filter(p => p.score >= threshold)
+    if (toSave.length) {
+      const now = Date.now()
+      const values = []
+      const params = []
+      let idx = 1
+      for (const p of toSave) {
+        values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`)
+        params.push('events_per_min', 'channel', null, p.y, p.score, threshold, JSON.stringify({ start: startTs, end: windowEnd }), JSON.stringify({ method: 'robust_z' }), new Date(p.t).getTime())
+      }
+      const sql = `INSERT INTO ai_anomalies (metric, entity_type, entity_id, value, score, threshold, window, context, ts) VALUES ${values.join(',')}`
+      await query(sql, params)
+    }
+
+    // Top outliers (response)
     const top = scored
       .slice()
       .sort((a,b)=>b.score-a.score)
@@ -44,7 +61,7 @@ export default withCors(withAuth(async function handler(req, res) {
       window: { start: startTs, end: windowEnd },
       series: scored,
       topOutliers: top,
-      thresholdHint: 3.0,
+      thresholdHint: threshold,
       timestamp: new Date().toISOString(),
     })
   } catch (e) {

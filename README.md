@@ -267,10 +267,15 @@ eli-dashboard/
 - `GET /api/login` - Verify current authentication status
 - `DELETE /api/login` - Logout and clear session
 
-### AI Endpoints (🔒 Protected)
+### AI Endpoints
+- `GET /api/ai/jobs` — List queued AI inference jobs for processing (Cloudflare Worker polling)
+- `POST /api/ai/poll` — Create jobs by scanning recent events/snapshots (for scheduled invocation)
+- `POST /api/ai/process-job` — Execute a single job (vision + analytics; called by Worker with `{ id }`)
+- `GET /api/ai/stream` — Server-Sent Events stream of recent anomalies for real-time UI
 - `GET /api/ai/predictive` — Predictive Analytics; includes Postgres/Neo4j/Cloudflare series and Vertex-generated forecasts
 - `GET /api/ai/behavior` — Behavioral Analysis; baselines + deviation hints via Vertex
 - `GET /api/ai/anomaly` — Anomaly Detection; robust z-scores and top outliers
+- `GET /api/ai/insights` — Vertex-generated operational insights and recommendations
 
 ### Dashboard Endpoints (🔒 Protected)
 - `GET /api/dashboard/health` - System health check (public)

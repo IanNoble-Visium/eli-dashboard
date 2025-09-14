@@ -7,6 +7,7 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import TinyPresetBar from '@/components/TinyPresetBar'
 import { useTimeRange } from '@/context/TimeRangeContext'
 import { useAuth } from '@/context/AuthContext'
+import { Button } from '@/components/ui/button'
 
 // Use same development default as AuthContext to avoid accidental /api calls to Vite dev server
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
@@ -62,6 +63,61 @@ function ForecastChart({ title, series, forecast }) {
   )
 }
 
+function InsightsFeed() {
+  const { token } = useAuth()
+  const [state, setState] = useState({ loading: true, error: null, data: null })
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      setState({ loading: true, error: null, data: null })
+      try {
+        const res = await fetch(`${API_BASE}/ai/insights-feed?scope=channel&limit=30`, { headers: { Authorization: `Bearer ${token}` }})
+        if (!res.ok) throw new Error(`${res.status}`)
+        const json = await res.json()
+        if (!cancelled) setState({ loading: false, error: null, data: json })
+      } catch (e) {
+        if (!cancelled) setState({ loading: false, error: e.message, data: null })
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [token, refreshKey])
+
+  if (state.loading) return <Skeleton className="h-48 w-full" />
+  if (state.error) return (
+    <Card>
+      <CardHeader><CardTitle>Insights</CardTitle></CardHeader>
+      <CardContent className="p-4 text-destructive">Failed to load insights: {state.error}</CardContent>
+    </Card>
+  )
+
+  const items = state.data?.data || []
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Recent Insights</CardTitle>
+        <Button size="sm" variant="outline" onClick={() => setRefreshKey(k => k+1)}>Refresh</Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.length === 0 && <div className="text-sm text-muted-foreground">No insights available yet.</div>}
+        {items.map(i => (
+          <div key={i.id} className="border rounded-md p-3">
+            <div className="text-sm mb-1">{new Date(i.ts).toLocaleString()}</div>
+            <div className="font-medium mb-1">{i.summary}</div>
+            {Array.isArray(i.recommendations) && i.recommendations.length > 0 && (
+              <ul className="list-disc ml-5 text-sm">
+                {i.recommendations.map((r, idx) => <li key={idx}>{r}</li>)}
+              </ul>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function AiAnalytics() {
   const { debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const params = new URLSearchParams()
@@ -88,6 +144,7 @@ export default function AiAnalytics() {
           <TabsTrigger value="predictive">Predictive Analytics</TabsTrigger>
           <TabsTrigger value="behavior">Behavioral Analysis</TabsTrigger>
           <TabsTrigger value="anomaly">Anomaly Detection</TabsTrigger>
+          <TabsTrigger value="insights">Insights</TabsTrigger>
         </TabsList>
 
         <TabsContent value="predictive" className="space-y-4">
@@ -161,6 +218,10 @@ export default function AiAnalytics() {
               </Card>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="insights" className="space-y-4">
+          <InsightsFeed />
         </TabsContent>
       </Tabs>
     </div>

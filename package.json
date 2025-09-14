@@ -15,7 +15,8 @@
     "lint": "eslint .",
     "setup:neo4j": "node --experimental-specifier-resolution=node scripts/setup-neo4j.js",
     "migrate:neo4j": "node --experimental-specifier-resolution=node scripts/migrate-to-neo4j.js",
-    "reset:neo4j": "npm run setup:neo4j && npm run migrate:neo4j"
+    "reset:neo4j": "npm run setup:neo4j && npm run migrate:neo4j",
+    "setup:ai-db": "node --experimental-specifier-resolution=node scripts/setup-ai-db.js"
   },
   "dependencies": {
     "@google-cloud/aiplatform": "^5.7.0",

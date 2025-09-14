@@ -39,6 +39,24 @@ NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your_password
 NEO4J_DATABASE=neo4j
 
+# Vertex AI / Vision
+GOOGLE_PROJECT_ID=your-gcp-project
+GOOGLE_LOCATION=us-central1
+# Provide one of the following for auth:
+# GOOGLE_SERVICE_ACCOUNT_JSON='{ "type": "service_account", ... }'
+# or GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json
+
+# CORS
+CORS_ORIGINS=https://your-dashboard.example
+```
+
+### Scheduling / Workers
+- Use a scheduler (Vercel Cron or Cloudflare Cron Worker) to invoke:
+  - `POST /api/ai/poll?since=<epochMillis>` to enqueue jobs from recent data
+  - `GET /api/ai/jobs?limit=25` to fetch queued jobs
+  - `POST /api/ai/process-job` with `{ id }` for each job to process
+- Optional: protect process-job/jobs by requiring a shared header from your Worker
+
 # Optional - CORS
 CORS_ORIGINS=https://your-frontend-domain.vercel.app,https://your-custom-domain.com
 ```

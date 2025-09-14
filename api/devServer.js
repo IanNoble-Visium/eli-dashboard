@@ -32,6 +32,9 @@ import identities from './dashboard/identities.js'
 import aiPredictive from './ai/predictive.js'
 import aiBehavior from './ai/behavior.js'
 import aiAnomaly from './ai/anomaly.js'
+import aiStream from './ai/stream.js'
+import aiProcessJob from './ai/process-job.js'
+import aiJobs from './ai/jobs.js'
 
 // Events
 import eventsIndex from './events/index.js'
@@ -98,6 +101,10 @@ app.all('/api/dashboard/identities', identities)
 app.all('/api/ai/predictive', aiPredictive)
 app.all('/api/ai/behavior', aiBehavior)
 app.all('/api/ai/anomaly', aiAnomaly)
+app.all('/api/ai/stream', aiStream)
+app.all('/api/ai/process-job', aiProcessJob)
+app.all('/api/ai/jobs', aiJobs)
+app.all('/api/ai/poll', (req, res) => import('./ai/poll.js').then(m => m.default(req, res)))
 
 // Events routes
 app.all('/api/events', eventsIndex)
