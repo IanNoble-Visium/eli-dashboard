@@ -10,6 +10,7 @@ export default withCors(withAuth(async function handler(req, res) {
     const offset = (page - 1) * limit
 
     const eventId = req.query.eventId
+    const channelId = req.query.channelId
     const type = req.query.type
 
     const startParam = req.query.start ? parseInt(req.query.start, 10) : null
@@ -28,6 +29,7 @@ export default withCors(withAuth(async function handler(req, res) {
       params.push(startTs)
     }
     if (eventId) { where.push(`s.event_id = $${params.length+1}`); params.push(eventId) }
+    if (channelId) { where.push(`e.channel_id = $${params.length+1}`); params.push(channelId) }
     if (type) { where.push(`s.type = $${params.length+1}`); params.push(type) }
 
     const countSql = `
@@ -53,7 +55,7 @@ export default withCors(withAuth(async function handler(req, res) {
     res.json({
       snapshots: result.rows || [],
       pagination: { page, limit, total, pages: Math.floor((total + limit - 1) / limit) },
-      filters: { eventId, type, timeRange },
+      filters: { eventId, channelId, type, timeRange },
       timestamp: new Date().toISOString()
     })
   } catch (e) {

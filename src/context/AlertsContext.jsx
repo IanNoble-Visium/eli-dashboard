@@ -78,6 +78,30 @@ export function AlertsProvider({ children }) {
 
   const unackedCount = useMemo(() => alerts.filter(a => !acked.has(a.id)).length, [alerts, acked])
 
+  const addAlerts = (arr = []) => {
+    if (!Array.isArray(arr) || arr.length === 0) return
+    setAlerts(prev => {
+      const ids = new Set(prev.map(a => a.id))
+      const merged = [...prev]
+      for (const a of arr) {
+        const n = {
+          id: a.id || `${a.kind || 'alert'}:${a.ts || Date.now()}:${a.channel_id || 'all'}`,
+          severity: a.severity || 'medium',
+          title: a.title || 'Alert',
+          message: a.message || '',
+          ts: a.ts || Date.now(),
+          channel_id: a.channel_id || null,
+          raw: a,
+        }
+        if (!ids.has(n.id)) {
+          merged.unshift(n)
+          ids.add(n.id)
+        }
+      }
+      return merged.slice(0, 200)
+    })
+  }
+
   const value = useMemo(() => ({
     alerts,
     ack,
@@ -89,6 +113,7 @@ export function AlertsProvider({ children }) {
     setThresholds,
     baselineOverlay,
     setBaselineOverlay,
+    addAlerts,
     API_BASE,
   }), [alerts, acked, unackedCount, thresholds, baselineOverlay])
 

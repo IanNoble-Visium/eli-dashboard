@@ -9,7 +9,7 @@ import { AlertsProvider } from '@/context/AlertsContext'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <TimeRangeProvider>
+      <TimeRangeProvider initial="1h">
         <AlertsProvider>
           <App />
         </AlertsProvider>

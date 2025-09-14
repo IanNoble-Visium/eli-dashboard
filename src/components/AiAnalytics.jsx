@@ -121,7 +121,7 @@ function InsightsFeed() {
 
 export default function AiAnalytics() {
   const { debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
-  const { getThresholds, baselineOverlay } = useAlerts()
+  const { getThresholds, baselineOverlay, addAlerts } = useAlerts()
   const params = new URLSearchParams()
   if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
     params.set('start', String(debouncedAbsoluteRange.start))
@@ -138,6 +138,14 @@ export default function AiAnalytics() {
   const thr = getThresholds(channelId || null)
   const thrParams = `&threshold_rate_pct=${encodeURIComponent(thr.ratePct)}&threshold_conf_below_pct=${encodeURIComponent(thr.confBelowPct)}&threshold_anom_per_hour=${encodeURIComponent(thr.anomPerHour)}`
   const metrics = useAuthedJson(`${API_BASE}/ai/metrics?${params.toString()}${channelId?`&channel_id=${encodeURIComponent(channelId)}`:''}${thrParams}`)
+
+
+  // Merge aggregate alerts from metrics into unified notification center (dedup in context)
+  useEffect(() => {
+    const list = metrics.data?.alertsDetailed
+    if (Array.isArray(list) && list.length) addAlerts(list)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metrics.data?.timestamp])
 
   return (
     <div className="space-y-6">
@@ -299,6 +307,30 @@ export default function AiAnalytics() {
                   )}
                 </CardContent>
               </Card>
+
+              {(metrics.data.totals?.velocity||[]).length>0 && (
+                <Card>
+                  <CardHeader><CardTitle>Detection Velocity</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between mb-2 text-sm">
+                      {(() => { const v=metrics.data.totals.velocity; const last=v[v.length-1]?.v ?? 0; const mom=metrics.data.totals.momentum ?? 0; return (
+                        <>
+                          <div><span className="text-muted-foreground">Last Δ/min:</span> <span className="font-medium">{last>0?'▲':(last<0?'▼':'•')} {Math.round(last)}</span></div>
+                          <div><span className="text-muted-foreground">Momentum:</span> <span className={`font-medium ${mom>0?'text-emerald-600':(mom<0?'text-red-600':'')}`}>{mom>0?'▲':(mom<0?'▼':'•')} {Math.round(mom)}</span></div>
+                        </>
+                      )})()}
+                    </div>
+                    <ChartContainer config={{ vel: { label: 'Δ detections/min', color: 'hsl(var(--primary))' } }} className="h-20">
+                      <AreaChart data={metrics.data.totals.velocity} margin={{ left: 12, right: 12, top: 4, bottom: 4 }}>
+                        <XAxis dataKey="t" hide />
+                        <YAxis hide />
+                        <Area type="monotone" dataKey="v" stroke="var(--color-vel)" fill="var(--color-vel)" fillOpacity={0.15} />
+                      </AreaChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              )}
+
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card>

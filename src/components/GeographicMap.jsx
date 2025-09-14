@@ -80,7 +80,7 @@ export function GeographicMap() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
+  const { timeRange, setTimeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const { authFetch, isAuthenticated } = useAuth()
   const [eventType, setEventType] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -129,6 +129,16 @@ export function GeographicMap() {
   const firstLoadRef = useRef(true)
   const inFlightRef = useRef(false)
   const lastQueryRef = useRef('')
+
+  // On first view of the map in this tab, prefer 1h to avoid heavy initial loads
+  useEffect(() => {
+    const key = 'eli.geoMap.defaulted'
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1')
+      if (timeRange !== '1h') setTimeRange('1h')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Compute a sensible server-side limit based on selected time window
   const computeGeoLimit = useCallback(() => {
@@ -233,7 +243,7 @@ export function GeographicMap() {
       setLoading(false)
       inFlightRef.current = false
     }
-  }, [debouncedAbsoluteRange, timeRange, eventType, isAuthenticated, authFetch])
+  }, [debouncedAbsoluteRange, debouncedTimeRange, eventType, isAuthenticated, authFetch, computeGeoLimit])
 
   // const fetchCameras = async () => {
   //   try {
@@ -317,6 +327,12 @@ export function GeographicMap() {
     try {
       setLoadingSnapshots(true)
       const params = new URLSearchParams({ page: '1', limit: '50', eventId: String(eventId) })
+      if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
+        params.set('start', String(debouncedAbsoluteRange.start))
+        params.set('end', String(debouncedAbsoluteRange.end))
+      } else {
+        params.set('timeRange', debouncedTimeRange)
+      }
       const res = await authFetch(`${API_BASE}/snapshots?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch snapshots')
       const data = await res.json()
@@ -345,10 +361,19 @@ export function GeographicMap() {
       } else {
         params.set('timeRange', debouncedTimeRange)
       }
-      const res = await authFetch(`${API_BASE}/snapshots?${params.toString()}`)
+      let res = await authFetch(`${API_BASE}/snapshots?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch camera snapshots')
-      const data = await res.json()
-      const snaps = (data.snapshots || []).filter(s => s.image_url)
+      let data = await res.json()
+      let snaps = (data.snapshots || []).filter(s => s.image_url)
+      // Fallback: if none found for narrow range, retry with 7d window
+      if (snaps.length === 0 && !debouncedAbsoluteRange?.start) {
+        const fallbackParams = new URLSearchParams({ page: '1', limit: '50', channelId: String(channelId), timeRange: '7d' })
+        res = await authFetch(`${API_BASE}/snapshots?${fallbackParams.toString()}`)
+        if (res.ok) {
+          data = await res.json()
+          snaps = (data.snapshots || []).filter(s => s.image_url)
+        }
+      }
       setSnapshotsCache(prev => ({ ...prev, [cacheKey]: snaps }))
       return snaps
     } catch (e) {
@@ -423,6 +448,7 @@ export function GeographicMap() {
     if (hoverDebounceRef.current) clearTimeout(hoverDebounceRef.current)
     hoverDebounceRef.current = setTimeout(async () => {
       setTooltipEvent(cam)
+      setTooltipLoading(true)
       const images = await fetchSnapshotsForCamera(cam.channel_id)
       setTooltipImages(images)
       setTooltipCurrentIndex(0)
@@ -432,6 +458,7 @@ export function GeographicMap() {
       if (images.length > 1) {
         startTooltipRotation(images)
       }
+      setTooltipLoading(false)
     }, 150)
   }
 
@@ -716,24 +743,18 @@ export function GeographicMap() {
                         key={`cam-${cam.channel_id}`}
                         position={[cam.lat, cam.lng]}
                         icon={createCustomIcon('#3b82f6')}
+                        eventHandlers={{
+                          mouseover: () => handleCameraTooltipOpen(cam),
+                          mouseout: () => handleTooltipClose(),
+                        }}
                       >
-                        <Popup>
-                          <div className="p-2">
-                            <div className="font-semibold mb-1">{cam.channel_name || `Camera ${cam.channel_id}`}</div>
-                            <div className="text-xs">ID: {cam.channel_id}</div>
-
-
-
-                          </div>
-                        </Popup>
                         <Tooltip
                           direction="top"
                           offset={[0, -10]}
                           opacity={1}
                           sticky={false}
                           permanent={false}
-                          onOpen={() => handleCameraTooltipOpen(cam)}
-                          onClose={() => handleTooltipClose()}
+                          
                         >
                           <div
                             className="bg-background border rounded shadow p-2 w-[300px] h-[250px] relative overflow-hidden"
@@ -811,7 +832,8 @@ export function GeographicMap() {
                         icon={createCustomIcon(eventTypeColors[event.topic] || eventTypeColors.default)}
                         eventHandlers={{
                           click: () => handleEventClick(event),
-                          // Hover thumbnails disabled for now to reduce extra API calls
+                          mouseover: () => handleTooltipOpen(event),
+                          mouseout: () => handleTooltipClose(),
                         }}
                       >
                         <Tooltip
@@ -820,8 +842,6 @@ export function GeographicMap() {
                           opacity={1}
                           sticky={false}
                           permanent={false}
-                          onOpen={() => handleTooltipOpen(event)}
-                          onClose={() => handleTooltipClose()}
                         >
                           <div
                             className="bg-background border rounded shadow p-2 w-[300px] h-[250px] relative overflow-hidden"
@@ -946,29 +966,6 @@ export function GeographicMap() {
                             )}
                           </div>
                         </Tooltip>
-                        <Popup>
-                          <div className="p-2 min-w-64">
-                            <h3 className="font-semibold mb-2">{event.topic}</h3>
-                            <div className="space-y-1 text-sm">
-                              <div className="flex items-center space-x-2">
-                                <Camera className="w-3 h-3" />
-                                <span>{event.channel_name}</span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Clock className="w-3 h-3" />
-                                <span>{formatTimestamp(event.start_time)}</span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Eye className="w-3 h-3" />
-                                <span>{event.snapshot_count} snapshots</span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <MapPin className="w-3 h-3" />
-                                <span>{event.latitude.toFixed(6)}, {event.longitude.toFixed(6)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </Popup>
                       </Marker>
                     ))}
                       </MapContainer>

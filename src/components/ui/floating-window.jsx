@@ -96,7 +96,7 @@ export default function FloatingWindow({
 
   return (
     <div
-      className={`fixed z-[60] shadow-xl border rounded-md bg-background backdrop-blur-sm ${className}`}
+      className={`fixed z-[2000] shadow-xl border rounded-md bg-background backdrop-blur-sm ${className}`}
       style={style}
       role="dialog"
       aria-modal="false"
