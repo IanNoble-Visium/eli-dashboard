@@ -103,6 +103,7 @@ function ExecutiveDashboard() {
   const [timeline, setTimeline] = useState([])
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const { authFetch, isAuthenticated } = useAuth()
+  const [timelineMeta, setTimelineMeta] = useState({ interval: '1 hour', timeRange: null })
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const [refreshing, setRefreshing] = useState(false)
@@ -135,7 +136,12 @@ function ExecutiveDashboard() {
       const timelineData = await timelineResponse.json()
       // Optimize for large datasets: limit to 100 points for performance
       const optimizedTimeline = (timelineData.data || []).slice(-100)
+        .map(d => ({
+          ...d,
+          event_count: Number(d.event_count)
+        }))
       setTimeline(optimizedTimeline)
+      setTimelineMeta({ interval: timelineData.interval || '1 hour', timeRange: timelineData.timeRange || null })
       setLastUpdated(new Date())
 
     } catch (err) {
@@ -197,6 +203,44 @@ function ExecutiveDashboard() {
       isAbsolute: !!(debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end)
     }
   }, [debouncedTimeRange, debouncedAbsoluteRange, metrics])
+
+  // X-axis tick formatter based on API-provided interval for cleaner labels
+  const formatXAxisTick = useCallback((value) => {
+    const d = new Date(value)
+    const intervalStr = timelineMeta?.interval || ''
+    if (intervalStr.includes('day')) {
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    }
+    if (intervalStr.includes('hour')) {
+      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric' })
+    }
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  }, [timelineMeta?.interval])
+
+  // Helper to compute a "nice" rounded upper bound
+  const computeNiceMax = useCallback((target) => {
+    if (!target || !isFinite(target)) return 10
+    const exp = Math.floor(Math.log10(target))
+    const base = Math.pow(10, exp)
+    // Richer set of steps for tighter fit (still "nice" round numbers)
+    const steps = [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]
+    const candidates = steps.map(m => m * base)
+    return candidates.find(c => c >= target) || 10 * base
+  }, [])
+
+  // Headroom factor and precomputed maximums
+  const HEADROOM = 1.35
+  const timelineMaxY = useMemo(() => {
+    return timeline.reduce((m, d) => {
+      const v = Number(d?.event_count) || 0
+      return v > m ? v : m
+    }, 0)
+  }, [timeline])
+
+  const niceMaxY = useMemo(() => {
+    if (!timelineMaxY) return 10
+    return computeNiceMax(timelineMaxY * HEADROOM)
+  }, [timelineMaxY, computeNiceMax])
 
 
   if (error) {
@@ -476,28 +520,62 @@ function ExecutiveDashboard() {
                 </div>
               </div>
             )}
-            <ResponsiveContainer width="100%" height={window.innerWidth < 768 ? 300 : 400}>
-              <AreaChart data={timeline}>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={timeline} margin={{ top: 16, right: 12, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="time_bucket"
-                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                  tickFormatter={formatXAxisTick}
+                  interval="preserveStartEnd"
+                  minTickGap={16}
+                  tick={{ fontSize: 11 }}
+                  tickMargin={8}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <YAxis domain={[0, 'dataMax + 10']} />
+                <YAxis
+                  yAxisId="left"
+                  domain={[0, (dataMax) => {
+                    const unified = Math.max(Number(dataMax) || 0, timelineMaxY)
+                    return computeNiceMax(unified * HEADROOM)
+                  }]}
+                  allowDecimals={false}
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => Number(v).toLocaleString()}
+                  tickCount={6}
+                  width={40}
+                  axisLine={false}
+                  tickLine={false}
+                  padding={{ top: 12 }}
+                />
                 <Tooltip
                   labelFormatter={(value) => new Date(value).toLocaleString()}
-                  formatter={(value, name) => [`${value} events`, name]}
+                  formatter={(value, name) => [`${Number(value).toLocaleString()} events`, name]}
                 />
                 <Legend />
+                <defs>
+                  <linearGradient id="timelineGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.05" />
+                  </linearGradient>
+                </defs>
                 <Area
-                  type="monotone"
+                  yAxisId="left"
+                  type="linear"
                   dataKey="event_count"
                   stroke="hsl(var(--primary))"
-                  fill="hsl(var(--primary))"
-                  fillOpacity={0.3}
+                  strokeWidth={2}
+                  fill="url(#timelineGradient)"
+                  dot={false}
+                  activeDot={{ r: 3 }}
                   name="Events"
                 />
-                <Brush dataKey="time_bucket" height={30} stroke="hsl(var(--primary))" />
+                <Brush
+                  dataKey="time_bucket"
+                  height={22}
+                  stroke="hsl(var(--primary))"
+                  tickFormatter={formatXAxisTick}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>

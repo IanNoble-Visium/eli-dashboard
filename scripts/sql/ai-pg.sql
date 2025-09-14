@@ -74,4 +74,11 @@ CREATE TABLE IF NOT EXISTS ai_insights (
 
 CREATE INDEX IF NOT EXISTS ai_insights_scope_ts_idx ON ai_insights (scope, scope_id, ts);
 
+
+-- Performance indexes for AI metrics endpoint
+CREATE INDEX IF NOT EXISTS ai_detections_ts_type_idx ON ai_detections (ts, type);
+-- channel_id, ts index already exists as ai_detections_channel_ts_idx
+CREATE INDEX IF NOT EXISTS ai_inference_jobs_updated_status_idx ON ai_inference_jobs (updated_at, status);
+CREATE INDEX IF NOT EXISTS ai_anomalies_ts_idx ON ai_anomalies (ts);
+
 COMMIT;

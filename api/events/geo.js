@@ -5,7 +5,9 @@ import { query, toMillisAgo } from '../_lib/db.js'
 export default withCors(withAuth(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' })
   try {
-    const limit = Math.min(parseInt(req.query.limit || '1000', 10), 2000)
+    // Raise defaults and caps to allow larger result sets for longer ranges
+    const reqLimit = parseInt(req.query.limit || '5000', 10)
+    const limit = Math.min(isNaN(reqLimit) ? 5000 : reqLimit, 10000)
     const eventType = req.query.eventType
 
     const startParam = req.query.start ? parseInt(req.query.start, 10) : null

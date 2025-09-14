@@ -48,7 +48,7 @@ export default withCors(withAuth(async function handler(req, res) {
     const sql = `
       SELECT
         TO_TIMESTAMP(FLOOR(start_time / 1000 / $${bucketIdx}) * $${bucketIdx}) as time_bucket,
-        COUNT(*) as event_count
+        COUNT(*)::int as event_count
       FROM events
       WHERE ${where.join(' AND ')}
       GROUP BY 1

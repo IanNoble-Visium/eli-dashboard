@@ -118,6 +118,8 @@ The dashboard features a robust authentication system with JWT tokens and sessio
 - **Edge properties display** (relationship type, strength, directionality, metadata)
 - Interactive controls and filtering
 - Toggle edge click feature on/off in settings
+- **Stationary layout after settle**: physics cools down quickly to prevent drift or recentering
+- **Always‑visible Mini‑map Navigator (New)**: top‑right of the graph for quick navigation across large topologies
 
 #### Topology Layout Selector (New)
 - Located in the Graph Controls panel on the Topology screen
@@ -135,6 +137,13 @@ The dashboard features a robust authentication system with JWT tokens and sessio
 - Reset Layout re-applies the active layout and fits view
 
 - Layout controls live in the Graph Controls panel with layout-specific spacing options
+
+#### Mini‑map Navigator (New)
+- Always visible in the top‑right of the Network Graph card (can be toggled)
+- Shows the full topology with compact node/edge rendering
+- Click any node in the mini‑map to center and zoom the main view to that area
+- Automatically stays in sync with the main graph and updates with the selected layout
+- Optimized for performance (smaller nodes, no arrows)
 
 ### Data Management
 - Comprehensive table view with events and snapshots
@@ -459,6 +468,31 @@ All dashboard components now use the centralized authentication system with enha
 
 ## 🔧 Recent Updates & Fixes
 
+### September 14, 2025 - Topology UI Redesign & Navigator
+
+#### ✅ Space Optimization & Controls Cleanup
+- Reorganized Graph Controls into compact rows (Search, Display Options, Layout)
+- Moved Node Types and Edge Types into side‑by‑side compact badge groups
+- Increased Network Graph height for better on‑page visibility
+
+#### ✅ Stationary Graph (No Unwanted Drift)
+- Shortened physics cooldown and increased friction to prevent post‑layout movement
+- Graph now stabilizes quickly and remains in place; users can still drag nodes intentionally
+
+#### ✅ Always‑visible Mini‑map Navigator
+- Integrated mini‑map into the Network Graph card (top‑right), no dialog required
+- Click on mini‑map nodes to center/zoom the main graph to the target area
+- Real‑time sync with the main graph and current layout
+- Toggle button provided in Graph Controls
+
+#### ✅ Data Visibility
+- Increased default graph data limit to show more nodes/edges for wider time windows
+
+#### 🎯 User Experience Benefits
+- Less scrolling, clearer controls, and better use of space
+- Persistent contextual overview with simple, precise navigation
+- Predictable, stable graph behavior without drifting off‑screen
+
 ### September 5, 2025 - Topology Edge Click Functionality
 
 #### ✅ **Interactive Edge Selection & Details**
@@ -720,8 +754,8 @@ All dashboard components now use the centralized authentication system with enha
 ---
 
 **Project Status**: ✅ **Production Ready & Fully Functional**
-**Version**: 1.4.0
-**Last Updated**: September 5, 2025
+**Version**: 1.5.0
+**Last Updated**: September 14, 2025
 **Deployment**: Vercel (Auto-deploy from main branch)
 **Authentication**: ✅ JWT-based with session management
 **CORS**: ✅ Fully resolved and production-ready

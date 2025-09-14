@@ -30,6 +30,8 @@ export default withCors(withAuth(async function handler(req, res) {
     const schema = {
       type: 'object',
       properties: {
+        summary: { type: 'string' },
+        recommendations: { type: 'array', items: { type: 'string' } },
         baselines: { type: 'array', items: { type: 'object', properties: {
           id: { type: 'string' }, label: { type: 'string' },
           ratePerMin: { type: 'number' }, topicDiversity: { type: 'number' },
@@ -46,6 +48,8 @@ export default withCors(withAuth(async function handler(req, res) {
       status: 'ok',
       window: { start: startTs, end: windowEnd },
       inputSample: base.rows?.slice(0, 5) || [],
+      summary: result.output?.summary || null,
+      recommendations: result.output?.recommendations || [],
       baselines: result.output?.baselines || [],
       notes: result.output?.notes || [],
       warning: result.error,

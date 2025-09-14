@@ -130,6 +130,22 @@ export function GeographicMap() {
   const inFlightRef = useRef(false)
   const lastQueryRef = useRef('')
 
+  // Compute a sensible server-side limit based on selected time window
+  const computeGeoLimit = useCallback(() => {
+    // Default buckets by relative range
+    const rangeDays = (() => {
+      if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
+        const diffMs = Number(debouncedAbsoluteRange.end) - Number(debouncedAbsoluteRange.start)
+        return Math.max(0.1, diffMs / (1000 * 60 * 60 * 24))
+      }
+      const map = { '30m': 0.02, '1h': 0.04, '4h': 0.17, '12h': 0.5, '24h': 1, '7d': 7, '30d': 30 }
+      return map[debouncedTimeRange] ?? 1
+    })()
+    if (rangeDays >= 7) return 10000
+    if (rangeDays >= 1) return 5000
+    return 2000
+  }, [debouncedTimeRange, debouncedAbsoluteRange])
+
   // Debug logging (only in development)
   if (import.meta.env.DEV) {
     console.log('GeographicMap component rendered', {
@@ -146,7 +162,8 @@ export function GeographicMap() {
 
     try {
       // Build query string first to dedupe identical requests
-      const params = new URLSearchParams({ limit: '1000' })
+      const dynamicLimit = computeGeoLimit()
+      const params = new URLSearchParams({ limit: String(dynamicLimit) })
       if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
         params.set('start', String(debouncedAbsoluteRange.start))
         params.set('end', String(debouncedAbsoluteRange.end))
@@ -314,6 +331,34 @@ export function GeographicMap() {
     }
   }
 
+  // Fetch snapshots by camera (channelId) for hover preview on camera markers
+  const fetchSnapshotsForCamera = async (channelId) => {
+    if (!channelId) return []
+    const cacheKey = `camera:${channelId}`
+    if (snapshotsCache[cacheKey]) return snapshotsCache[cacheKey]
+    try {
+      setLoadingSnapshots(true)
+      const params = new URLSearchParams({ page: '1', limit: '50', channelId: String(channelId) })
+      if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
+        params.set('start', String(debouncedAbsoluteRange.start))
+        params.set('end', String(debouncedAbsoluteRange.end))
+      } else {
+        params.set('timeRange', debouncedTimeRange)
+      }
+      const res = await authFetch(`${API_BASE}/snapshots?${params.toString()}`)
+      if (!res.ok) throw new Error('Failed to fetch camera snapshots')
+      const data = await res.json()
+      const snaps = (data.snapshots || []).filter(s => s.image_url)
+      setSnapshotsCache(prev => ({ ...prev, [cacheKey]: snaps }))
+      return snaps
+    } catch (e) {
+      console.error('Failed to fetch snapshots for camera', channelId, e)
+      return []
+    } finally {
+      setLoadingSnapshots(false)
+    }
+  }
+
   const openImageViewerForEvent = async (event) => {
     const group = events.filter(e => e.channel_id === event.channel_id)
       .sort((a, b) => {
@@ -371,6 +416,23 @@ export function GeographicMap() {
     })
     setTooltipLoading(false)
     return snaps
+  }
+
+  // Camera tooltip image loader
+  const handleCameraTooltipOpen = async (cam) => {
+    if (hoverDebounceRef.current) clearTimeout(hoverDebounceRef.current)
+    hoverDebounceRef.current = setTimeout(async () => {
+      setTooltipEvent(cam)
+      const images = await fetchSnapshotsForCamera(cam.channel_id)
+      setTooltipImages(images)
+      setTooltipCurrentIndex(0)
+      setTooltipPlaying(true)
+      setTooltipZoom(1)
+      setTooltipPan({ x: 0, y: 0 })
+      if (images.length > 1) {
+        startTooltipRotation(images)
+      }
+    }, 150)
   }
 
   const handleTooltipOpen = async (event) => {
@@ -573,10 +635,6 @@ export function GeographicMap() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Debug Info */}
-              <div className="mb-4 p-2 bg-yellow-100 border border-yellow-300 rounded text-xs">
-                <strong>🐛 Debug Info:</strong> Loading: {loading.toString()}, Error: {error || 'none'}, Events: {events.length}, API: {API_BASE}
-              </div>
 
               {(() => {
                 if (!import.meta.env.DEV) {
@@ -668,6 +726,81 @@ export function GeographicMap() {
 
                           </div>
                         </Popup>
+                        <Tooltip
+                          direction="top"
+                          offset={[0, -10]}
+                          opacity={1}
+                          sticky={false}
+                          permanent={false}
+                          onOpen={() => handleCameraTooltipOpen(cam)}
+                          onClose={() => handleTooltipClose()}
+                        >
+                          <div
+                            className="bg-background border rounded shadow p-2 w-[300px] h-[250px] relative overflow-hidden"
+                            role="tooltip"
+                            aria-live="polite"
+                          >
+                            {tooltipImages.length === 0 ? (
+                              <div className="w-full h-full grid place-items-center text-xs text-muted-foreground">
+                                {tooltipLoading ? (
+                                  <div className="flex items-center space-x-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+                                    <span>Loading images…</span>
+                                  </div>
+                                ) : (
+                                  <>No images available for this camera</>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                <div className="relative w-full h-[180px] overflow-hidden rounded bg-black/10">
+                                  <img
+                                    src={tooltipImages[tooltipCurrentIndex]?.image_url}
+                                    alt={`Camera snapshot ${tooltipCurrentIndex + 1} of ${tooltipImages.length} for ${cam.channel_name}`}
+                                    className="w-full h-full object-contain transition-transform duration-200 ease-out"
+                                    style={{
+                                      transform: `scale(${tooltipZoom}) translate(${tooltipPan.x}px, ${tooltipPan.y}px)`
+                                    }}
+                                  />
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-1 text-xs" aria-live="polite">
+                                    <div aria-label={`Image ${tooltipCurrentIndex + 1} of ${tooltipImages.length}`}>
+                                      Image {tooltipCurrentIndex + 1} of {tooltipImages.length}
+                                    </div>
+                                    <div aria-label={`Camera: ${cam.channel_name}`}>{cam.channel_name}</div>
+                                    <div aria-label={`Timestamp: ${formatTimestamp(tooltipImages[tooltipCurrentIndex]?.timestamp || cam.start_time)}`}>
+                                      {formatTimestamp(tooltipImages[tooltipCurrentIndex]?.timestamp || cam.start_time)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between mt-2">
+                                  <div className="flex items-center space-x-1" role="group" aria-label="Image navigation controls">
+                                    <Button size="sm" variant="outline" onClick={prevTooltipImage} className="h-6 w-6 p-0" aria-label="Previous image">
+                                      <ChevronLeft className="w-3 h-3" aria-hidden="true" />
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={toggleTooltipPlayPause} className="h-6 w-6 p-0" aria-label={tooltipPlaying ? "Pause slideshow" : "Play slideshow"}>
+                                      {tooltipPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={nextTooltipImage} className="h-6 w-6 p-0" aria-label="Next image">
+                                      <ChevronRight className="w-3 h-3" aria-hidden="true" />
+                                    </Button>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <label htmlFor="cam-speed-select" className="text-xs sr-only">Slideshow speed</label>
+                                    <select id="cam-speed-select" value={tooltipSpeed} onChange={(e) => handleTooltipSpeedChange(Number(e.target.value))} className="text-xs h-6 px-1 border rounded" aria-label="Select slideshow speed">
+                                      <option value={1000}>1s</option>
+                                      <option value={2000}>2s</option>
+                                      <option value={3000}>3s</option>
+                                      <option value={5000}>5s</option>
+                                    </select>
+                                    <Button size="sm" variant="outline" onClick={() => { setTooltipZoom(1); setTooltipPan({x:0,y:0}) }} className="h-6 px-2" aria-label="Reset zoom">
+                                      Reset
+                                    </Button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </Tooltip>
                       </Marker>
                     ))}
 

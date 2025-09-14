@@ -13,11 +13,18 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import AlertCenterList from '@/components/AlertCenter'
+import SettingsDialog from '@/components/SettingsDialog'
+import { useAlerts } from '@/context/AlertsContext'
 
 export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode, onLogout }) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [lastUpdate, setLastUpdate] = useState(new Date())
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { unackedCount, ackAll } = useAlerts()
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -108,15 +115,25 @@ export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode, 
           </Button>
 
           {/* Notifications */}
-          <Button variant="ghost" size="sm" className="relative">
-            <Bell className="w-5 h-5" />
-            <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs"
-            >
-              3
-            </Badge>
-          </Button>
+          <Popover open={notifOpen} onOpenChange={setNotifOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="relative">
+                <Bell className="w-5 h-5" />
+                {unackedCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs"
+                    title={`${unackedCount} new alerts`}
+                  >
+                    {Math.min(unackedCount, 9)}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="p-2">
+              <AlertCenterList onAckAll={() => { ackAll(); setNotifOpen(false) }} />
+            </PopoverContent>
+          </Popover>
 
           {/* Dark Mode Toggle */}
           <Button
@@ -142,7 +159,7 @@ export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode, 
           </Button>
 
           {/* Settings */}
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)} title="Settings">
             <Settings className="w-5 h-5" />
           </Button>
 
@@ -155,6 +172,8 @@ export function Header({ sidebarOpen, setSidebarOpen, darkMode, toggleDarkMode, 
               {currentTime.toLocaleDateString()}
             </span>
           </div>
+
+          <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
         </div>
       </div>
     </header>

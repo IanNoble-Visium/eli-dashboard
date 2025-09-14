@@ -44,9 +44,10 @@ export default withCors(withAuth(async function handler(req, res) {
       let idx = 1
       for (const p of toSave) {
         values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`)
-        params.push('events_per_min', 'channel', null, p.y, p.score, threshold, JSON.stringify({ start: startTs, end: windowEnd }), JSON.stringify({ method: 'robust_z' }), new Date(p.t).getTime())
+        // Use correct JSONB column name (win) and pass JS objects (pg will serialize to JSONB)
+        params.push('events_per_min', 'channel', null, p.y, p.score, threshold, { start: startTs, end: windowEnd }, { method: 'robust_z' }, new Date(p.t).getTime())
       }
-      const sql = `INSERT INTO ai_anomalies (metric, entity_type, entity_id, value, score, threshold, window, context, ts) VALUES ${values.join(',')}`
+      const sql = `INSERT INTO ai_anomalies (metric, entity_type, entity_id, value, score, threshold, win, context, ts) VALUES ${values.join(',')}`
       await query(sql, params)
     }
 

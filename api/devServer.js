@@ -36,6 +36,8 @@ import aiStream from './ai/stream.js'
 import aiProcessJob from './ai/process-job.js'
 import aiJobs from './ai/jobs.js'
 import aiInsightsFeed from './ai/insights-feed.js'
+import aiMetrics from './ai/metrics.js'
+
 
 // Events
 import eventsIndex from './events/index.js'
@@ -65,6 +67,23 @@ process.on('uncaughtException', (err) => {
 if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
   console.warn('[dev:api] Warning: POSTGRES_URL/DATABASE_URL is not set. API will run but DB-backed endpoints will return 500.')
 }
+
+// Global CORS for dev to ensure preflights succeed even on 404s
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+  const allowed = (process.env.CORS_ORIGINS || '').split(',').filter(Boolean)
+  const allow = origin && (origin.includes('localhost') || allowed.includes(origin))
+  if (allow) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    const reqHeaders = req.headers['access-control-request-headers']
+    res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization')
+  }
+  if (req.method === 'OPTIONS') return res.status(204).end()
+  next()
+})
 
 
 
@@ -105,6 +124,8 @@ app.all('/api/ai/anomaly', aiAnomaly)
 app.all('/api/ai/stream', aiStream)
 app.all('/api/ai/process-job', aiProcessJob)
 app.all('/api/ai/jobs', aiJobs)
+app.all('/api/ai/metrics', aiMetrics)
+
 app.all('/api/ai/poll', (req, res) => import('./ai/poll.js').then(m => m.default(req, res)))
 app.all('/api/ai/insights-feed', aiInsightsFeed)
 

@@ -22,14 +22,6 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { useTimeRange } from '@/context/TimeRangeContext'
 import { useAuth } from '@/context/AuthContext'
@@ -75,12 +67,8 @@ function SimpleTopology() {
   const [enableEdgeClick, setEnableEdgeClick] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
-  const [showMiniMapDialog, setShowMiniMapDialog] = useState(false)
-  const [miniMapZoom, setMiniMapZoom] = useState(1)
-  const [miniMapOpacity, setMiniMapOpacity] = useState(0.8)
-  const [miniMapSize, setMiniMapSize] = useState(300)
-  const [showOffScreenNotification, setShowOffScreenNotification] = useState(false)
-  const [offScreenNodes, setOffScreenNodes] = useState([])
+  const [showMiniMap, setShowMiniMap] = useState(true)
+  const [miniMapSize, setMiniMapSize] = useState(200)
   const { timeRange, debouncedTimeRange, debouncedAbsoluteRange } = useTimeRange()
   const { authFetch, isAuthenticated } = useAuth()
   const graphRef = useRef()
@@ -222,7 +210,7 @@ function SimpleTopology() {
     try {
       setLoading(true)
       setError(null)
-      const params = new URLSearchParams({ limit: '300' })
+      const params = new URLSearchParams({ limit: '500' })
       if (debouncedAbsoluteRange?.start && debouncedAbsoluteRange?.end) {
         params.set('start', String(debouncedAbsoluteRange.start))
         params.set('end', String(debouncedAbsoluteRange.end))
@@ -288,67 +276,6 @@ function SimpleTopology() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  // Detect off-screen nodes when mini-map is open
-  useEffect(() => {
-    if (!showMiniMapDialog || !graphRef.current) return
-
-    const checkOffScreenNodes = () => {
-      try {
-        const canvas = graphRef.current.canvas
-        if (!canvas) return
-
-        const rect = canvas.getBoundingClientRect()
-        const offScreen = graphData.nodes.filter(node => {
-          if (!isNodeVisible(node)) return false
-          const screenX = node.x
-          const screenY = node.y
-          return screenX < 0 || screenX > rect.width || screenY < 0 || screenY > rect.height
-        })
-
-        setOffScreenNodes(offScreen)
-        setShowOffScreenNotification(offScreen.length > 0)
-      } catch (e) {
-        // Silently handle errors
-      }
-    }
-
-    const interval = setInterval(checkOffScreenNodes, 2000)
-    checkOffScreenNodes() // Initial check
-
-    return () => clearInterval(interval)
-  }, [showMiniMapDialog, graphData.nodes, visibleNodeTypes])
-
-  // Keyboard shortcuts for mini-map
-  useEffect(() => {
-    if (!showMiniMapDialog) return
-
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        switch (e.key) {
-          case 'm':
-            e.preventDefault()
-            setShowMiniMapDialog(false)
-            break
-          case '+':
-          case '=':
-            e.preventDefault()
-            setMiniMapZoom(prev => Math.min(3, prev + 0.1))
-            break
-          case '-':
-            e.preventDefault()
-            setMiniMapZoom(prev => Math.max(0.1, prev - 0.1))
-            break
-          case '0':
-            e.preventDefault()
-            setMiniMapZoom(1)
-            break
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showMiniMapDialog])
 
 
 
@@ -506,312 +433,89 @@ function SimpleTopology() {
             <span>Graph Controls</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-             <div>
-               <label className="text-sm font-medium mb-2 block">Search Nodes</label>
-               <Input
-                 placeholder="Search nodes..."
-                 value={searchTerm}
-                 onChange={(e) => setSearchTerm(e.target.value)}
-                 className="w-full"
-               />
-             </div>
-
-             <div>
-               <label className="text-sm font-medium mb-2 block">Display Options</label>
-               <div className="space-y-2">
-                 <div className="flex items-center space-x-2">
-                   <Switch
-                     checked={showImages}
-                     onCheckedChange={setShowImages}
-                   />
-                   <span className="text-sm">Show Images</span>
-                 </div>
-                 <div className="flex items-center space-x-2">
-                   <Switch
-                     checked={enableEdgeClick}
-                     onCheckedChange={setEnableEdgeClick}
-                   />
-                   <span className="text-sm">Enable Edge Click</span>
-                 </div>
-               </div>
-             </div>
-
-             {/* Layout Selector */}
-             <div>
-               <label className="text-sm font-medium mb-2 block">Layout</label>
-               <div className="space-y-2">
-                 <Select value={layoutMode} onValueChange={(v) => setLayoutMode(v)}>
-                   <SelectTrigger className="w-full"><SelectValue placeholder="Select layout" /></SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="force">Force-directed</SelectItem>
-                     <SelectItem value="hierarchical">Hierarchical (Top→Down)</SelectItem>
-                     <SelectItem value="grid">Grid</SelectItem>
-                     <SelectItem value="radial">Radial</SelectItem>
-                     <SelectItem value="circular">Circular</SelectItem>
-                   </SelectContent>
-                 </Select>
-
-                 {layoutMode === 'grid' && (
-                   <div className="flex items-center space-x-2">
-                     <span className="text-xs w-24">Grid spacing</span>
-                     <Slider value={gridValueArr} min={60} max={240} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, gridSpacing: v[0]}))} className="flex-1" />
-                     <span className="text-xs w-10 text-right">{layoutOptions.gridSpacing}</span>
-                   </div>
-                 )}
-                 {layoutMode === 'radial' && (
-                   <div className="flex items-center space-x-2">
-                     <span className="text-xs w-24">Ring spacing</span>
-                     <Slider value={radialValueArr} min={80} max={300} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, radialRingSpacing: v[0]}))} className="flex-1" />
-                     <span className="text-xs w-10 text-right">{layoutOptions.radialRingSpacing}</span>
-                   </div>
-                 )}
-                 {layoutMode === 'circular' && (
-                   <div className="flex items-center space-x-2">
-                     <span className="text-xs w-24">Radius</span>
-                     <Slider value={circularValueArr} min={120} max={600} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, circularRadius: v[0]}))} className="flex-1" />
-                     <span className="text-xs w-10 text-right">{layoutOptions.circularRadius}</span>
-                   </div>
-                 )}
-                 {layoutMode === 'hierarchical' && (
-                   <div className="flex items-center space-x-2">
-                     <span className="text-xs w-24">Layer gap</span>
-                     <Slider value={hierValueArr} min={80} max={400} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, hierarchicalDistance: v[0]}))} className="flex-1" />
-                     <span className="text-xs w-10 text-right">{layoutOptions.hierarchicalDistance}</span>
-                   </div>
-                 )}
-               </div>
-             </div>
+        <CardContent className="space-y-4">
+          {/* First Row: Search, Display Options, Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Search Nodes</label>
+              <Input
+                placeholder="Search nodes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Graph Controls</label>
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleZoomIn} variant="outline" size="sm" aria-label="Zoom in">
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-                <Button onClick={handleZoomOut} variant="outline" size="sm" aria-label="Zoom out">
-                  <ZoomOut className="w-4 h-4" />
-                </Button>
-                <Button onClick={handleFitToView} variant="outline" size="sm" aria-label="Fit to view">
-                  <Maximize className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={() => setVisibleNodeTypes([])}
-                  variant="outline"
-                  size="sm"
-                  aria-label="Hide all node types"
-                >
-                  <EyeOff className="w-4 h-4 mr-1" />
-                  All Off
-                </Button>
-                <Button
-                  onClick={handleResetLayout}
-                  variant="outline"
-                  size="sm"
-                  aria-label="Reset layout"
-                >
-                  <RotateCcw className="w-4 h-4 mr-1" />
-                  Reset Layout
-                </Button>
-
-                <Dialog open={showMiniMapDialog} onOpenChange={setShowMiniMapDialog}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" aria-label="Open mini-map navigator">
-                      <Maximize className="w-4 h-4 mr-1" />
-                      Mini-map
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center space-x-2">
-                        <Network className="w-5 h-5" />
-                        <span>Mini-map Navigator</span>
-                      </DialogTitle>
-                      <DialogDescription>
-                        Interactive overview of the complete topology. Click nodes/links to navigate, use controls below for customization.
-                        <br />
-                        <span className="text-xs text-muted-foreground mt-1 block">
-                          Keyboard: Ctrl+M (close), Ctrl+± (zoom), Ctrl+0 (reset zoom)
-                        </span>
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                      {/* Mini-map Controls */}
-                      <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm font-medium">Zoom:</label>
-                            <Slider
-                              value={[miniMapZoom]}
-                              onValueChange={(value) => setMiniMapZoom(value[0])}
-                              min={0.1}
-                              max={3}
-                              step={0.1}
-                              className="w-20"
-                            />
-                            <span className="text-xs text-muted-foreground w-8">{miniMapZoom.toFixed(1)}x</span>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm font-medium">Opacity:</label>
-                            <Slider
-                              value={[miniMapOpacity]}
-                              onValueChange={(value) => setMiniMapOpacity(value[0])}
-                              min={0.1}
-                              max={1}
-                              step={0.1}
-                              className="w-20"
-                            />
-                            <span className="text-xs text-muted-foreground w-8">{Math.round(miniMapOpacity * 100)}%</span>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm font-medium">Size:</label>
-                            <Slider
-                              value={[miniMapSize]}
-                              onValueChange={(value) => setMiniMapSize(value[0])}
-                              min={200}
-                              max={600}
-                              step={50}
-                              className="w-20"
-                            />
-                            <span className="text-xs text-muted-foreground w-12">{miniMapSize}px</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            onClick={() => {
-                              if (miniMapRef.current) {
-                                try { miniMapRef.current.zoomToFit(400) } catch(_) {}
-                              }
-                            }}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <Maximize className="w-4 h-4 mr-1" />
-                            Fit View
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Mini-map Visualization */}
-                      <div
-                        className="border rounded-lg overflow-hidden bg-background"
-                        style={{ height: miniMapSize, opacity: miniMapOpacity }}
-                      >
-                        <ForceGraph2D
-                          ref={miniMapRef}
-                          graphData={graphData}
-                          width={miniMapSize}
-                          height={miniMapSize}
-                          nodeLabel=""
-                          nodeColor={(node) => node.color}
-                          nodeVal={(node) => node.size * miniMapZoom}
-                          linkColor={(link) => link.color}
-                          linkWidth={(link) => link.width * miniMapZoom}
-                          linkDirectionalArrowLength={2 * miniMapZoom}
-                          linkDirectionalArrowRelPos={1}
-                          minMap={false}
-                          dagMode={layoutMode === 'hierarchical' ? 'td' : undefined}
-                          dagLevelDistance={layoutMode === 'hierarchical' ? layoutOptions.hierarchicalDistance : undefined}
-                          onNodeClick={(node) => {
-                            // Sync with main graph
-                            if (graphRef.current) {
-                              graphRef.current.centerAt(node.x, node.y, 1000)
-                              graphRef.current.zoom(2, 1000)
-                            }
-                            setShowMiniMapDialog(false)
-                          }}
-                          onLinkClick={(link) => {
-                            // Center on link midpoint
-                            const sourceNode = graphData.nodes.find(n => n.id === link.source)
-                            const targetNode = graphData.nodes.find(n => n.id === link.target)
-                            if (sourceNode && targetNode && graphRef.current) {
-                              const midX = (sourceNode.x + targetNode.x) / 2
-                              const midY = (sourceNode.y + targetNode.y) / 2
-                              graphRef.current.centerAt(midX, midY, 1000)
-                              graphRef.current.zoom(1.5, 1000)
-                            }
-                            setShowMiniMapDialog(false)
-                          }}
-                          nodeCanvasObject={(node, ctx) => {
-                            if (!isNodeVisible(node)) return
-                            const radius = node.size * miniMapZoom
-                            ctx.fillStyle = node.color
-                            ctx.beginPath()
-                            ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false)
-                            ctx.fill()
-                          }}
-                        />
-                      </div>
-
-                      {/* Off-screen Elements Notification */}
-                      {offScreenNodes.length > 0 && (
-                        <div className="p-3 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <Eye className="w-4 h-4 text-yellow-600" />
-                              <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                {offScreenNodes.length} nodes outside current view
-                              </span>
-                            </div>
-                            <Button
-                              onClick={() => {
-                                if (graphRef.current) {
-                                  graphRef.current.zoomToFit(400)
-                                }
-                              }}
-                              variant="outline"
-                              size="sm"
-                            >
-                              Show All
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Statistics */}
-                      <div className="grid grid-cols-4 gap-4 text-sm">
-                        <div className="text-center p-2 bg-muted/50 rounded">
-                          <div className="font-semibold">{filteredNodes.length}</div>
-                          <div className="text-muted-foreground">Visible Nodes</div>
-                        </div>
-                        <div className="text-center p-2 bg-muted/50 rounded">
-                          <div className="font-semibold">{filteredLinks.length}</div>
-                          <div className="text-muted-foreground">Visible Edges</div>
-                        </div>
-                        <div className="text-center p-2 bg-muted/50 rounded">
-                          <div className="font-semibold">{graphData.nodes.length}</div>
-                          <div className="text-muted-foreground">Total Nodes</div>
-                        </div>
-                        <div className="text-center p-2 bg-muted/50 rounded">
-                          <div className="font-semibold">{timeRange}</div>
-                          <div className="text-muted-foreground">Time Range</div>
-                        </div>
-                      </div>
-
-                      {/* Legend */}
-                      <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg">
-                        <span className="text-sm font-medium mr-2">Legend:</span>
-                        {Object.entries(nodeConfig).filter(([key]) => key !== 'default').slice(0, 4).map(([type, config]) => (
-                          <div key={type} className="flex items-center space-x-1">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: config.color }}
-                            />
-                            <span className="text-xs">{type}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+              <label className="text-sm font-medium mb-2 block">Display Options</label>
+              <div className="flex gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={showImages}
+                    onCheckedChange={setShowImages}
+                    id="show-images"
+                  />
+                  <label htmlFor="show-images" className="text-sm cursor-pointer">Show Images</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={enableEdgeClick}
+                    onCheckedChange={setEnableEdgeClick}
+                    id="enable-edge"
+                  />
+                  <label htmlFor="enable-edge" className="text-sm cursor-pointer">Enable Edge Click</label>
+                </div>
               </div>
             </div>
 
+            {/* Layout Selector */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Layout</label>
+              <Select value={layoutMode} onValueChange={(v) => setLayoutMode(v)}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Select layout" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="force">Force-directed</SelectItem>
+                  <SelectItem value="hierarchical">Hierarchical (Top→Down)</SelectItem>
+                  <SelectItem value="grid">Grid</SelectItem>
+                  <SelectItem value="radial">Radial</SelectItem>
+                  <SelectItem value="circular">Circular</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Layout-specific options inline */}
+              {layoutMode === 'grid' && (
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="text-xs">Spacing:</span>
+                  <Slider value={gridValueArr} min={60} max={240} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, gridSpacing: v[0]}))} className="flex-1" />
+                  <span className="text-xs w-8 text-right">{layoutOptions.gridSpacing}</span>
+                </div>
+              )}
+              {layoutMode === 'radial' && (
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="text-xs">Ring gap:</span>
+                  <Slider value={radialValueArr} min={80} max={300} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, radialRingSpacing: v[0]}))} className="flex-1" />
+                  <span className="text-xs w-8 text-right">{layoutOptions.radialRingSpacing}</span>
+                </div>
+              )}
+              {layoutMode === 'circular' && (
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="text-xs">Radius:</span>
+                  <Slider value={circularValueArr} min={120} max={600} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, circularRadius: v[0]}))} className="flex-1" />
+                  <span className="text-xs w-8 text-right">{layoutOptions.circularRadius}</span>
+                </div>
+              )}
+              {layoutMode === 'hierarchical' && (
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="text-xs">Layer gap:</span>
+                  <Slider value={hierValueArr} min={80} max={400} step={10} onValueChange={(v) => setLayoutOptions(o => ({...o, hierarchicalDistance: v[0]}))} className="flex-1" />
+                  <span className="text-xs w-8 text-right">{layoutOptions.hierarchicalDistance}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Second Row: Node Types and Edge Types */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Node Types</label>
               <div className="flex flex-wrap gap-2">
@@ -819,7 +523,7 @@ function SimpleTopology() {
                   <Badge
                     key={type}
                     variant={visibleNodeTypes.includes(type) ? "default" : "outline"}
-                    className="cursor-pointer flex items-center space-x-1"
+                    className="cursor-pointer flex items-center space-x-1 text-xs"
                     onClick={() => {
                       if (visibleNodeTypes.includes(type)) {
                         setVisibleNodeTypes(visibleNodeTypes.filter(t => t !== type))
@@ -829,7 +533,7 @@ function SimpleTopology() {
                     }}
                   >
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
-                    <span className="text-xs">{type}</span>
+                    <span>{type}</span>
                   </Badge>
                 ))}
               </div>
@@ -841,14 +545,58 @@ function SimpleTopology() {
                 {Object.entries(edgeConfig).filter(([key]) => key !== 'default').map(([type, config]) => (
                   <Badge
                     key={type}
-                    variant="default"
-                    className="flex items-center space-x-1"
+                    variant="secondary"
+                    className="flex items-center space-x-1 text-xs"
                   >
-                    <div className="w-2 h-1 rounded" style={{ backgroundColor: config.color }} />
-                    <span className="text-xs">{type}</span>
+                    <div className="w-3 h-0.5 rounded" style={{ backgroundColor: config.color }} />
+                    <span>{type}</span>
                   </Badge>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* Third Row: Graph Controls */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Graph Controls</label>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handleZoomIn} variant="outline" size="sm" aria-label="Zoom in">
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+              <Button onClick={handleZoomOut} variant="outline" size="sm" aria-label="Zoom out">
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <Button onClick={handleFitToView} variant="outline" size="sm" aria-label="Fit to view">
+                <Maximize className="w-4 h-4" />
+              </Button>
+              <Button
+                onClick={() => setVisibleNodeTypes([])}
+                variant="outline"
+                size="sm"
+                aria-label="Hide all node types"
+              >
+                <EyeOff className="w-4 h-4 mr-1" />
+                All Off
+              </Button>
+              <Button
+                onClick={handleResetLayout}
+                variant="outline"
+                size="sm"
+                aria-label="Reset layout"
+              >
+                <RotateCcw className="w-4 h-4 mr-1" />
+                Reset Layout
+              </Button>
+              
+              <Button
+                onClick={() => setShowMiniMap(!showMiniMap)}
+                variant="outline"
+                size="sm"
+                aria-label="Toggle mini-map"
+              >
+                {showMiniMap ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
+                Mini-map
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -859,7 +607,7 @@ function SimpleTopology() {
       <div className={`grid grid-cols-1 ${fullPage ? 'lg:grid-cols-1' : 'lg:grid-cols-4'} gap-6`}>
         {/* Graph Visualization */}
         <div className={fullPage ? "lg:col-span-1" : "lg:col-span-3"}>
-          <Card>
+          <Card className="relative">
            <CardHeader>
              <CardTitle className="flex items-center space-x-2">
                <Network className="w-5 h-5" />
@@ -870,7 +618,7 @@ function SimpleTopology() {
              </CardDescription>
            </CardHeader>
             <CardContent>
-              <div className={`${fullPage ? 'h-[calc(100vh-200px)]' : 'h-96'} rounded-lg overflow-hidden border relative`}>
+              <div className={`${fullPage ? 'h-[calc(100vh-200px)]' : 'h-[500px]'} rounded-lg overflow-hidden border relative`}>
                 {loading && (
                   <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
                     <div className="text-center">
@@ -886,11 +634,18 @@ function SimpleTopology() {
                   graphData={graphData}
                   width={graphWidth}
                   height={graphHeight}
-                  nodeLabel={''}
+                  nodeLabel={''}  
                   nodeColor={() => undefined}
                   nodeVal={(node) => node.size}
                   dagMode={layoutMode === 'hierarchical' ? 'td' : undefined}
                   dagLevelDistance={layoutMode === 'hierarchical' ? layoutOptions.hierarchicalDistance : undefined}
+                  cooldownTime={3000} // Stop simulation after 3 seconds
+                  cooldownTicks={100} // Reduce computation after initial placement
+                  d3AlphaDecay={0.02} // Faster stabilization
+                  d3VelocityDecay={0.4} // More friction to prevent drift
+                  enableNodeDrag={true}
+                  enablePanInteraction={true}
+                  enableZoomInteraction={true}
                   linkColor={(link) => {
                     const base = (selectedEdge && link === selectedEdge) ? '#ff6b35' : (link.color || '#999')
                     const toRgba = (hex, a) => {
@@ -1012,6 +767,60 @@ function SimpleTopology() {
                   }}
                 />
               </div>
+              
+              {/* Mini-map Navigator */}
+              {showMiniMap && !fullPage && (
+                <div className="absolute top-4 right-4 bg-background border-2 border-border rounded-lg shadow-lg overflow-hidden" style={{ width: miniMapSize + 4, height: miniMapSize + 4 }}>
+                  <div className="relative" style={{ width: miniMapSize, height: miniMapSize }}>
+                    <ForceGraph2D
+                      ref={miniMapRef}
+                      graphData={graphData}
+                      width={miniMapSize}
+                      height={miniMapSize}
+                      nodeLabel=""
+                      nodeColor={(node) => isNodeVisible(node) ? node.color : 'rgba(0,0,0,0)'}
+                      nodeVal={(node) => node.size * 0.5}
+                      linkColor={(link) => isLinkVisible(link) ? link.color : 'rgba(0,0,0,0)'}
+                      linkWidth={(link) => isLinkVisible(link) ? link.width * 0.5 : 0}
+                      linkDirectionalArrowLength={0}
+                      minZoom={0.1}
+                      maxZoom={1}
+                      cooldownTime={3000}
+                      cooldownTicks={100}
+                      d3AlphaDecay={0.02}
+                      d3VelocityDecay={0.4}
+                      enableNodeDrag={false}
+                      enablePanInteraction={false}
+                      enableZoomInteraction={false}
+                      dagMode={layoutMode === 'hierarchical' ? 'td' : undefined}
+                      dagLevelDistance={layoutMode === 'hierarchical' ? layoutOptions.hierarchicalDistance : undefined}
+                      onNodeClick={(node) => {
+                        if (graphRef.current) {
+                          graphRef.current.centerAt(node.x, node.y, 1000)
+                          graphRef.current.zoom(2, 1000)
+                        }
+                      }}
+                      onEngineStop={() => {
+                        // Fit mini-map to view once layout is complete
+                        if (miniMapRef.current) {
+                          try { miniMapRef.current.zoomToFit(0, 20) } catch(_) {}
+                        }
+                      }}
+                      nodeCanvasObjectMode={() => 'replace'}
+                      nodeCanvasObject={(node, ctx) => {
+                        if (!isNodeVisible(node)) return
+                        ctx.fillStyle = node.color
+                        ctx.beginPath()
+                        ctx.arc(node.x, node.y, node.size * 0.5, 0, 2 * Math.PI)
+                        ctx.fill()
+                      }}
+                    />
+                  </div>
+                  <div className="absolute bottom-1 left-1 text-xs text-muted-foreground bg-background/80 px-1 rounded">
+                    Navigator
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
