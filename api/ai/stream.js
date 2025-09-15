@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     while (alive) {
       try {
         const r = await query(
-          `SELECT id, metric, entity_type, entity_id, value, score, threshold, window, context, ts
+          `SELECT id, metric, entity_type, entity_id, value, score, threshold, context, ts
            FROM ai_anomalies WHERE ts > $1 ORDER BY ts ASC LIMIT 50`,
           [lastTs]
         )
