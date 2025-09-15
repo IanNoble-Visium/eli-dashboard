@@ -98,6 +98,7 @@ The dashboard features a robust authentication system with JWT tokens and sessio
 - **Interactive charts**: Event distribution, camera activity with synchronized data
 - **Timeline visualization**: Integrated histogram with zoom slider functionality
 - **Smart Event Counting**: Displays "X Events" or "X of Y Events" when filtered
+- **Identity Image Viewer**: Clickable face and plate identities with image carousel modals
 - **System health monitoring**: Live status indicators and refresh controls
 - **Auto-refresh functionality**: Manual and automatic data refresh capabilities
 
@@ -390,6 +391,8 @@ All dashboard components now use the centralized authentication system with enha
 - **@google-cloud/aiplatform**: Vertex AI SDK (installed)
 - **@google-cloud/vertexai**: Server-side Gemini client (installed)
 - **graphql-request**: Cloudflare Analytics GraphQL (installed)
+- **embla-carousel-react**: Carousel component library (installed)
+- **embla-carousel-autoplay**: Auto-play plugin for image carousels (installed)
 
 ## 🔒 Security
 
@@ -457,6 +460,7 @@ All dashboard components now use the centralized authentication system with enha
 ## 🎉 Features Delivered
 
 ✅ **Executive Dashboard** - Optimized layout with dynamic event counting and unified time range controls
+✅ **Identity Image Viewer** - Interactive face and plate identity image display with carousel and auto-rotation
 ✅ **Geographic Map** - Interactive map with terrain features and hover previews
 ✅ **Topology** - Multi-layout network visualization (force, hierarchical, grid, radial, circular) with interactive edge selection
 ✅ **Data Management** - Comprehensive table with CRUD operations
@@ -467,6 +471,49 @@ All dashboard components now use the centralized authentication system with enha
 ✅ **Production Ready** - Scalable architecture with proper error handling and performance optimization
 
 ## 🔧 Recent Updates & Fixes
+
+### September 15, 2025 - Identity Image Viewer Enhancement
+
+#### ✅ **Interactive Identity Image Display**
+
+**🖼️ Face Identities Image Viewer**
+- **Clickable Names**: Face names in the identities table are now clickable with hover effects
+- **Modal Image Display**: Clicking a name opens a dialog showing all captured images for that face identity
+- **Image Carousel**: Multiple images displayed in a responsive carousel with navigation controls
+- **Auto-Rotation**: Toggle button to enable/disable automatic image cycling (3-second intervals)
+- **Professional UI**: Clean modal design with proper image sizing and controls
+
+**🚗 Plates Identities Image Viewer**
+- **Clickable Numbers**: License plate numbers in the identities table are now clickable
+- **Modal Image Display**: Clicking a plate number opens a dialog showing all captured images for that plate identity
+- **Image Carousel**: Same carousel functionality as face identities with manual and auto navigation
+- **Auto-Rotation**: Consistent auto-rotation controls with 3-second intervals
+- **Responsive Design**: Optimized for different screen sizes and image aspect ratios
+
+**🔧 Technical Implementation**
+- **Backend Enhancement**: Modified `/api/dashboard/identities` to include image URLs from associated events
+- **Graph Query Optimization**: Added image collection from MATCHED_FACE/MATCHED_PLATE event relationships
+- **Frontend Integration**: Added Dialog and Carousel components with Embla Carousel autoplay plugin
+- **State Management**: Proper modal state handling with auto-rotation controls
+- **Performance**: Efficient image loading and carousel rendering
+
+**📦 Dependencies Added**
+- **embla-carousel-autoplay**: Added for smooth automatic image transitions
+- **Integration**: Seamlessly integrated with existing shadcn/ui carousel components
+
+#### 🎯 **User Experience Benefits**
+
+**✨ Enhanced Identity Investigation**
+- **Visual Verification**: Users can now visually verify face and plate identities with captured images
+- **Multiple Captures**: View all available images for comprehensive identity analysis
+- **Quick Access**: Direct click-to-view functionality from identity tables
+- **Professional Presentation**: Clean, organized image display with intuitive controls
+
+**📱 Improved Interface Design**
+- **Consistent UI Patterns**: Follows same design patterns as other modal components
+- **Space Efficient**: Utilizes existing dialog system without layout disruption
+- **Responsive Images**: Proper image scaling and aspect ratio handling
+- **Accessibility**: Keyboard navigation and proper ARIA labels
 
 ### September 14, 2025 - Topology UI Redesign & Navigator
 
@@ -754,12 +801,12 @@ All dashboard components now use the centralized authentication system with enha
 ---
 
 **Project Status**: ✅ **Production Ready & Fully Functional**
-**Version**: 1.5.0
-**Last Updated**: September 14, 2025
+**Version**: 1.6.0
+**Last Updated**: September 15, 2025
 **Deployment**: Vercel (Auto-deploy from main branch)
 **Authentication**: ✅ JWT-based with session management
 **CORS**: ✅ Fully resolved and production-ready
-**Dashboard**: ✅ Optimized layout with dynamic event counting
+**Dashboard**: ✅ Optimized layout with dynamic event counting and identity image viewers
 
 Built for **Visium Technologies** - **TruContext Intelligence Platform**
 

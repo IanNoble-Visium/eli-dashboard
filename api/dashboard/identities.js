@@ -26,8 +26,10 @@ export default withCors(async function handler(req, res) {
       WITH fi, e
       WHERE fi IS NOT NULL
       OPTIONAL MATCH (fi)-[:IN_LIST]->(wl:Watchlist)
-      WITH fi, collect(DISTINCT wl) AS wls, count(DISTINCT e) AS events
-      RETURN fi AS node, wls AS lists, events AS events
+      OPTIONAL MATCH (e)-[:HAS_SNAPSHOT]->(img:Image)
+      WITH fi, collect(DISTINCT wl) AS wls, count(DISTINCT e) AS events,
+           collect(DISTINCT coalesce(img.image_url, img.path, img.url)) AS imageUrls
+      RETURN fi AS node, wls AS lists, events AS events, imageUrls AS images
       ORDER BY coalesce(fi.similarity, 0) DESC
       LIMIT toInteger($facesLimit)
     `
@@ -37,13 +39,15 @@ export default withCors(async function handler(req, res) {
       const node = r.get('node')
       const wls = r.get('lists') || []
       const events = r.get('events') || 0
+      const images = r.get('images') || []
       return {
         id: node?.properties?.id,
         similarity: node?.properties?.similarity ?? null,
         first_name: node?.properties?.first_name ?? null,
         last_name: node?.properties?.last_name ?? null,
         watchlists: wls.map(w => ({ id: w.properties?.id, name: w.properties?.name, level: w.properties?.level })),
-        events: Number(events) || 0
+        events: Number(events) || 0,
+        images: images.filter(url => url) // filter out nulls
       }
     })
 
@@ -55,8 +59,10 @@ export default withCors(async function handler(req, res) {
       WITH pi, e
       WHERE pi IS NOT NULL
       OPTIONAL MATCH (pi)-[:IN_LIST]->(wl:Watchlist)
-      WITH pi, collect(DISTINCT wl) AS wls, count(DISTINCT e) AS events
-      RETURN pi AS node, wls AS lists, events AS events
+      OPTIONAL MATCH (e)-[:HAS_SNAPSHOT]->(img:Image)
+      WITH pi, collect(DISTINCT wl) AS wls, count(DISTINCT e) AS events,
+           collect(DISTINCT coalesce(img.image_url, img.path, img.url)) AS imageUrls
+      RETURN pi AS node, wls AS lists, events AS events, imageUrls AS images
       ORDER BY coalesce(pi.number, '') ASC
       LIMIT toInteger($platesLimit)
     `
@@ -66,6 +72,7 @@ export default withCors(async function handler(req, res) {
       const node = r.get('node')
       const wls = r.get('lists') || []
       const events = r.get('events') || 0
+      const images = r.get('images') || []
       return {
         id: node?.properties?.id,
         number: node?.properties?.number ?? null,
@@ -73,7 +80,8 @@ export default withCors(async function handler(req, res) {
         owner_first_name: node?.properties?.owner_first_name ?? null,
         owner_last_name: node?.properties?.owner_last_name ?? null,
         watchlists: wls.map(w => ({ id: w.properties?.id, name: w.properties?.name, level: w.properties?.level })),
-        events: Number(events) || 0
+        events: Number(events) || 0,
+        images: images.filter(url => url) // filter out nulls
       }
     })
 

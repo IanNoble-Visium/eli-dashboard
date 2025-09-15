@@ -30,6 +30,7 @@ import {
   Area,
   BarChart,
   Bar,
+  LabelList,
   PieChart,
   Pie,
   Cell,
@@ -297,11 +298,83 @@ function ExecutiveDashboard() {
     }
   ]
 
-  const eventTypeData = metrics?.eventTypes?.map(type => ({
+  // Chart helpers and styling
+  const COLOR_PALETTE = ['#2563eb', '#22c55e', '#ef4444', '#f59e0b', '#06b6d4', '#a855f7', '#14b8a6', '#f97316']
+  const numberShort = (n) => {
+    const v = Number(n) || 0
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+    if (v >= 1_000) return `${(v / 1_000).toFixed(1).replace(/\.0$/, '')}k`
+    return v.toLocaleString()
+  }
+  // Theme-aware tooltip styles reused across charts
+  const tooltipContentStyle = {
+    background: 'hsl(var(--popover))',
+    color: 'hsl(var(--popover-foreground))',
+    border: '1px solid hsl(var(--border))',
+    borderRadius: 6,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+    padding: '8px 10px',
+    lineHeight: 1.2
+  }
+  const tooltipItemStyle = { color: 'hsl(var(--popover-foreground))', fontSize: 12 }
+  const tooltipLabelStyle = { color: 'hsl(var(--muted-foreground))', fontSize: 12, marginBottom: 4 }
+
+
+  const RADIAN = Math.PI / 180
+  const renderPieLabel = ({ cx, cy, midAngle, outerRadius, name, percent }) => {
+    // Only label larger slices to avoid overlap; all values appear in the legend
+    if (percent < 0.08) return null
+    const radius = outerRadius + 12
+    const x = cx + radius * Math.cos(-midAngle * RADIAN)
+    const y = cy + radius * Math.sin(-midAngle * RADIAN)
+    return (
+      <text x={x} y={y} fill="#334155" fontSize={12} textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+        {`${name} ${(percent * 100).toFixed(0)}%`}
+      </text>
+    )
+  }
+
+  const renderEventTypeLegend = (props) => {
+    const payload = props?.payload || []
+    const chartWidth = Number(props?.width || props?.chartWidth || 0)
+    const cols = chartWidth < 380 ? 1 : chartWidth < 650 ? 2 : 3
+    const total = payload.reduce((sum, p) => sum + (Number(p?.payload?.value) || 0), 0)
+    return (
+      <div style={{ marginTop: 8 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(140px, 1fr))`, gap: '6px 12px', fontSize: 12 }}>
+          {payload.map((entry, i) => {
+            const val = Number(entry?.payload?.value) || 0
+            const pct = total ? Math.round((val / total) * 100) : 0
+            const color = entry.color || entry?.payload?.fill
+            return (
+              <li key={`legend-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, display: 'inline-block', flex: '0 0 auto' }} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.value}</span>
+                <span style={{ color: 'var(--muted-foreground, #64748b)', flex: '0 0 auto' }}>{val.toLocaleString()} ({pct}%)</span>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    )
+  }
+
+  const renderBarValueLabel = (props) => {
+    const { x, y, width, height, value } = props
+    const posX = x + width + 6
+    const posY = y + height / 2
+    return (
+      <text x={posX} y={posY} fill="#334155" fontSize={12} textAnchor="start" dominantBaseline="middle">
+        {(Number(value) || 0).toLocaleString()}
+      </text>
+    )
+  }
+
+  const eventTypeData = (metrics?.eventTypes || []).map((type, idx) => ({
     name: type.topic,
     value: Number(type.count),
-    fill: `hsl(${Math.random() * 360}, 70%, 50%)`
-  })) || []
+    fill: COLOR_PALETTE[idx % COLOR_PALETTE.length]
+  }))
 
   const cameraActivityData = metrics?.cameraActivity?.slice(0, 5).map(camera => ({
     name: camera.channel_name?.split(' - ')[1] || `Camera ${camera.channel_id}`,
@@ -444,23 +517,28 @@ function ExecutiveDashboard() {
                 </div>
               </div>
             )}
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
                   data={eventTypeData}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
+                  innerRadius={50}
+                  outerRadius={92}
+                  paddingAngle={3}
+                  minAngle={6}
                   dataKey="value"
+                  labelLine
+                  label={renderPieLabel}
+                  stroke="#ffffff"
+                  strokeWidth={1}
                 >
                   {eventTypeData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value, name) => [Number(value).toLocaleString(), name]} contentStyle={tooltipContentStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
+                <Legend verticalAlign="bottom" align="center" content={renderEventTypeLegend} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -483,19 +561,36 @@ function ExecutiveDashboard() {
                 </div>
               </div>
             )}
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={cameraActivityData}>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={cameraActivityData} layout="vertical" margin={{ top: 8, right: 36, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="name"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  fontSize={12}
+                  type="number"
+                  domain={[0, (dataMax) => computeNiceMax((Number(dataMax) || 0) * 1.15)]}
+                  tick={{ fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={numberShort}
                 />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="events" fill="hsl(var(--primary))" />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={160}
+                  tick={{ fontSize: 12 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                />
+                <defs>
+                  <linearGradient id="cameraBarGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.85" />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.65" />
+                  </linearGradient>
+                </defs>
+                <Tooltip formatter={(v) => [Number(v).toLocaleString(), 'Events']} cursor={{ fill: 'rgba(0,0,0,0.04)' }} contentStyle={tooltipContentStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
+                <Bar dataKey="events" fill="url(#cameraBarGradient)" radius={[4, 4, 4, 4]} isAnimationActive={false}>
+                  <LabelList dataKey="events" content={renderBarValueLabel} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -521,7 +616,7 @@ function ExecutiveDashboard() {
               </div>
             )}
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={timeline} margin={{ top: 16, right: 12, left: 0, bottom: 8 }}>
+              <AreaChart data={timeline} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="time_bucket"
@@ -541,22 +636,25 @@ function ExecutiveDashboard() {
                   }]}
                   allowDecimals={false}
                   tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => Number(v).toLocaleString()}
+                  tickFormatter={numberShort}
                   tickCount={6}
-                  width={40}
+                  width={44}
                   axisLine={false}
                   tickLine={false}
                   padding={{ top: 12 }}
                 />
                 <Tooltip
                   labelFormatter={(value) => new Date(value).toLocaleString()}
-                  formatter={(value, name) => [`${Number(value).toLocaleString()} events`, name]}
+                  formatter={(value) => [Number(value).toLocaleString(), 'Events']}
+                  contentStyle={tooltipContentStyle}
+                  itemStyle={tooltipItemStyle}
+                  labelStyle={tooltipLabelStyle}
                 />
                 <Legend />
                 <defs>
                   <linearGradient id="timelineGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
-                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.05" />
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.75" />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.10" />
                   </linearGradient>
                 </defs>
                 <Area
