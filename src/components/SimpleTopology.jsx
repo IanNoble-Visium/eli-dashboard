@@ -73,6 +73,9 @@ function SimpleTopology() {
   const { authFetch, isAuthenticated } = useAuth()
   const graphRef = useRef()
   const miniMapRef = useRef()
+  const containerRef = useRef(null)
+  // Viewport rectangle in mini-map representing main view
+  const [viewportRect, setViewportRect] = useState({ left: 0, top: 0, width: 0, height: 0 })
   // Layout state
   const [layoutMode, setLayoutMode] = useState('force') // 'force' | 'hierarchical' | 'grid' | 'radial' | 'circular'
   const [layoutOptions, setLayoutOptions] = useState({
@@ -82,11 +85,59 @@ function SimpleTopology() {
     hierarchicalDistance: 150,
   })
 
+  // ResizeObserver to keep graph canvas sized to its container
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      const cr = entries[0].contentRect
+      setGraphWidth(Math.max(0, Math.floor(cr.width)))
+      setGraphHeight(Math.max(0, Math.floor(cr.height)))
+      try { graphRef.current?.d3ReheatSimulation?.() } catch (_) {}
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [fullPage])
+
+  // Keep mini-map viewport indicator in sync with main graph view
+  const updateViewportRect = useCallback(() => {
+    if (!graphRef.current || !miniMapRef.current) return
+    try {
+      const tlWorld = graphRef.current.screen2GraphCoords(0, 0)
+      const brWorld = graphRef.current.screen2GraphCoords(graphWidth, graphHeight)
+      if (!tlWorld || !brWorld) return
+      const tlMini = miniMapRef.current.graph2ScreenCoords(tlWorld.x, tlWorld.y)
+      const brMini = miniMapRef.current.graph2ScreenCoords(brWorld.x, brWorld.y)
+      if (!tlMini || !brMini) return
+      const left = Math.min(tlMini.x, brMini.x)
+      const top = Math.min(tlMini.y, brMini.y)
+      const width = Math.abs(brMini.x - tlMini.x)
+      const height = Math.abs(brMini.y - tlMini.y)
+      setViewportRect({ left, top, width, height })
+    } catch (_) {}
+  }, [graphWidth, graphHeight])
+
+  useEffect(() => {
+    if (!showMiniMap) return
+    const id = setInterval(updateViewportRect, 200)
+    return () => clearInterval(id)
+  }, [showMiniMap, updateViewportRect])
+
   // Memoized slider value arrays to avoid ref churn in Radix Slider
   const gridValueArr = useMemo(() => [layoutOptions.gridSpacing], [layoutOptions.gridSpacing])
   const radialValueArr = useMemo(() => [layoutOptions.radialRingSpacing], [layoutOptions.radialRingSpacing])
   const circularValueArr = useMemo(() => [layoutOptions.circularRadius], [layoutOptions.circularRadius])
   const hierValueArr = useMemo(() => [layoutOptions.hierarchicalDistance], [layoutOptions.hierarchicalDistance])
+
+
+  // Initial measure in case ResizeObserver fires late
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setGraphWidth(Math.max(0, Math.floor(rect.width)))
+    setGraphHeight(Math.max(0, Math.floor(rect.height)))
+  }, [fullPage])
 
   // Apply layout by fixing node positions (fx, fy) for non-force layouts
   const applyLayout = useCallback(() => {
@@ -481,7 +532,7 @@ function SimpleTopology() {
                   <SelectItem value="circular">Circular</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               {/* Layout-specific options inline */}
               {layoutMode === 'grid' && (
                 <div className="flex items-center space-x-2 mt-2">
@@ -587,7 +638,7 @@ function SimpleTopology() {
                 <RotateCcw className="w-4 h-4 mr-1" />
                 Reset Layout
               </Button>
-              
+
               <Button
                 onClick={() => setShowMiniMap(!showMiniMap)}
                 variant="outline"
@@ -618,7 +669,7 @@ function SimpleTopology() {
              </CardDescription>
            </CardHeader>
             <CardContent>
-              <div className={`${fullPage ? 'h-[calc(100vh-200px)]' : 'h-[500px]'} rounded-lg overflow-hidden border relative`}>
+              <div ref={containerRef} className={`${fullPage ? 'h-[calc(100vh-200px)]' : 'h-[500px]'} rounded-lg overflow-hidden border relative`}>
                 {loading && (
                   <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
                     <div className="text-center">
@@ -634,7 +685,7 @@ function SimpleTopology() {
                   graphData={graphData}
                   width={graphWidth}
                   height={graphHeight}
-                  nodeLabel={''}  
+                  nodeLabel={''}
                   nodeColor={() => undefined}
                   nodeVal={(node) => node.size}
                   dagMode={layoutMode === 'hierarchical' ? 'td' : undefined}
@@ -767,10 +818,20 @@ function SimpleTopology() {
                   }}
                 />
               </div>
-              
+
               {/* Mini-map Navigator */}
               {showMiniMap && !fullPage && (
-                <div className="absolute top-4 right-4 bg-background border-2 border-border rounded-lg shadow-lg overflow-hidden" style={{ width: miniMapSize + 4, height: miniMapSize + 4 }}>
+                <div
+                  className="absolute top-4 right-4 bg-background border-2 border-border rounded-lg shadow-lg overflow-hidden z-20"
+                  style={{ width: miniMapSize + 4, height: miniMapSize + 4 }}
+                  onWheel={(e) => {
+                    e.preventDefault()
+                    if (!graphRef.current) return
+                    const current = graphRef.current.zoom()
+                    const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2
+                    graphRef.current.zoom(current * factor, 200)
+                  }}
+                >
                   <div className="relative" style={{ width: miniMapSize, height: miniMapSize }}>
                     <ForceGraph2D
                       ref={miniMapRef}
@@ -801,10 +862,11 @@ function SimpleTopology() {
                         }
                       }}
                       onEngineStop={() => {
-                        // Fit mini-map to view once layout is complete
+                        // Fit mini-map to view once layout is complete and update viewport box
                         if (miniMapRef.current) {
                           try { miniMapRef.current.zoomToFit(0, 20) } catch(_) {}
                         }
+                        updateViewportRect()
                       }}
                       nodeCanvasObjectMode={() => 'replace'}
                       nodeCanvasObject={(node, ctx) => {
@@ -815,6 +877,18 @@ function SimpleTopology() {
                         ctx.fill()
                       }}
                     />
+
+                    {/* Viewport indicator (reflects current main view) */}
+                    <div
+                      className="absolute border-2 border-primary bg-primary/10 pointer-events-none"
+                      style={{ left: viewportRect.left, top: viewportRect.top, width: viewportRect.width, height: viewportRect.height }}
+                    />
+
+                    {/* Mini-map zoom controls */}
+                    <div className="absolute top-1 right-1 flex flex-col space-y-1 z-30">
+                      <Button size="icon" variant="secondary" className="h-6 w-6 p-0" onClick={handleZoomIn}>+</Button>
+                      <Button size="icon" variant="secondary" className="h-6 w-6 p-0" onClick={handleZoomOut}>-</Button>
+                    </div>
                   </div>
                   <div className="absolute bottom-1 left-1 text-xs text-muted-foreground bg-background/80 px-1 rounded">
                     Navigator

@@ -50,6 +50,7 @@ import eventGeo from './events/geo.js'
 import snapshotsIndex from './snapshots/index.js'
 import snapshotById from './snapshots/[id].js'
 import snapshotTypes from './snapshots/types.js'
+import legacyMedia from './legacy/media.js'
 
 // Users
 import usersIndex from './users/index.js'
@@ -144,6 +145,10 @@ app.all('/api/snapshots/:id', withParamToQuery('id', snapshotById))
 // Users routes
 app.all('/api/users', usersIndex)
 app.all('/api/users/:id', withParamToQuery('id', userById))
+
+// Legacy media proxy to support historic URLs like /api/v1/media/snapshot/... and /api/snapshot/... → redirect to snapshot.image_url
+app.all('/api/v1/media/*', legacyMedia)
+app.all('/api/snapshot/*', legacyMedia)
 
 // 404 for unmatched routes (keep last)
 app.use((req, res) => {

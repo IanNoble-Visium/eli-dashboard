@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Play, Pause } from 'lucide-react'
 import Autoplay from 'embla-carousel-autoplay'
 import { useTimeRange } from '@/context/TimeRangeContext'
+import { normalizeApiUrl, normalizeImageUrls } from '@/lib/utils'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 
@@ -24,14 +25,7 @@ export default function FaceIdentitiesPanel() {
   const [selectedFace, setSelectedFace] = useState(null)
   const [autoRotate, setAutoRotate] = useState(false)
 
-  const normalizeImageUrls = (urls) => {
-    if (!Array.isArray(urls)) return []
-    const normalized = urls
-      .map(u => typeof u === 'string' ? u.trim() : '')
-      .filter(Boolean)
-      .map(u => (u.startsWith('http') ? u : `${API_BASE}${u}`))
-    return Array.from(new Set(normalized))
-  }
+  const normalizeImages = (urls) => normalizeImageUrls(urls, API_BASE)
 
   const fetchGraph = async () => {
     try {
@@ -44,14 +38,14 @@ export default function FaceIdentitiesPanel() {
       } else {
         params.set('timeRange', debouncedTimeRange)
       }
-      const res = await fetch(`${API_BASE}/dashboard/identities?${params.toString()}`)
+      const res = await fetch(normalizeApiUrl(`/dashboard/identities?${params.toString()}`, API_BASE))
       if (!res.ok) throw new Error('Failed to fetch face identities')
       const json = await res.json()
       // Map to unified display rows from identities endpoint
       const nodes = (json.faces || []).map(f => ({
         id: f.id,
         type: 'FaceIdentity',
-        properties: { first_name: f.first_name, last_name: f.last_name, similarity: f.similarity, images: normalizeImageUrls(f.images) }
+        properties: { first_name: f.first_name, last_name: f.last_name, similarity: f.similarity, images: normalizeImages(f.images) }
       }))
       setData({ nodes, edges: [] })
     } catch (e) {

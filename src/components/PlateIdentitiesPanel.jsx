@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Play, Pause } from 'lucide-react'
 import Autoplay from 'embla-carousel-autoplay'
 import { useTimeRange } from '@/context/TimeRangeContext'
+import { normalizeApiUrl, normalizeImageUrls } from '@/lib/utils'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 
@@ -23,14 +24,7 @@ export default function PlateIdentitiesPanel() {
   const [selectedPlate, setSelectedPlate] = useState(null)
   const [autoRotate, setAutoRotate] = useState(false)
 
-  const normalizeImageUrls = (urls) => {
-    if (!Array.isArray(urls)) return []
-    const normalized = urls
-      .map(u => typeof u === 'string' ? u.trim() : '')
-      .filter(Boolean)
-      .map(u => (u.startsWith('http') ? u : `${API_BASE}${u}`))
-    return Array.from(new Set(normalized))
-  }
+  const normalizeImages = (urls) => normalizeImageUrls(urls, API_BASE)
 
   const fetchGraph = async () => {
     try {
@@ -43,7 +37,7 @@ export default function PlateIdentitiesPanel() {
       } else {
         params.set('timeRange', debouncedTimeRange)
       }
-      const res = await fetch(`${API_BASE}/dashboard/identities?${params.toString()}`)
+      const res = await fetch(normalizeApiUrl(`/dashboard/identities?${params.toString()}`, API_BASE))
       if (!res.ok) throw new Error('Failed to fetch plate identities')
       const json = await res.json()
       const nodes = (json.plates || []).map(p => ({
@@ -54,7 +48,7 @@ export default function PlateIdentitiesPanel() {
           state: p.state,
           owner_first_name: p.owner_first_name,
           owner_last_name: p.owner_last_name,
-          images: normalizeImageUrls(p.images)
+          images: normalizeImages(p.images)
         }
       }))
       setData({ nodes, edges: [] })

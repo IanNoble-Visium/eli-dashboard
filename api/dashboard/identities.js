@@ -28,7 +28,7 @@ export default withCors(async function handler(req, res) {
       OPTIONAL MATCH (fi)-[:IN_LIST]->(wl:Watchlist)
       OPTIONAL MATCH (e)-[:HAS_SNAPSHOT]->(img:Image)
       WITH fi, collect(DISTINCT wl) AS wls, count(DISTINCT e) AS events,
-           collect(DISTINCT coalesce(img.image_url, img.path, img.url)) AS imageUrls
+           collect(DISTINCT img.image_url) AS imageUrls
       RETURN fi AS node, wls AS lists, events AS events, imageUrls AS images
       ORDER BY coalesce(fi.similarity, 0) DESC
       LIMIT toInteger($facesLimit)
@@ -61,7 +61,7 @@ export default withCors(async function handler(req, res) {
       OPTIONAL MATCH (pi)-[:IN_LIST]->(wl:Watchlist)
       OPTIONAL MATCH (e)-[:HAS_SNAPSHOT]->(img:Image)
       WITH pi, collect(DISTINCT wl) AS wls, count(DISTINCT e) AS events,
-           collect(DISTINCT coalesce(img.image_url, img.path, img.url)) AS imageUrls
+           collect(DISTINCT img.image_url) AS imageUrls
       RETURN pi AS node, wls AS lists, events AS events, imageUrls AS images
       ORDER BY coalesce(pi.number, '') ASC
       LIMIT toInteger($platesLimit)
